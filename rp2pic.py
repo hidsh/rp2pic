@@ -28,7 +28,19 @@ DEVICE_LIST = {
         "C": [0x8007, 0x0002, 0x3FFF],  # Address, Size, Value
         "D": [0xF000, 0x0100, 0x00FF],  # Address, Size, Value
         "N": "PIC12F1822",  # Device Name
-    }
+    },
+    0x2CE0: {  # Device ID
+        "P": [0x0000, 0x0800, 0x3FFF],  # Address, Size, Value
+        "C": [0x8007, 0x0002, 0x3FFF],  # Address, Size, Value
+        "D": [0xF000, 0x0100, 0x00FF],  # Address, Size, Value
+        "N": "PIC16F1503",  # Device Name
+    },
+    0x2400: {  # Device ID
+        "P": [0x0000, 0x0800, 0x3FFF],  # Address, Size, Value
+        "C": [0x8007, 0x0002, 0x3FFF],  # Address, Size, Value
+        "D": [0xF000, 0x0100, 0x00FF],  # Address, Size, Value
+        "N": "PIC16F1933",  # Device Name
+    },
 
 }
 
