@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# PIC16F1xxx LV-ICSP Programmer by Seeeduino XIAO RP2040 and CircuitPython
+# PIC16F1xxx LV-ICSP Programmer by RP2040 bros. and CircuitPython
 #
 # Seeeduino XIAO RP2040      Microchip PIC12F1822
 #   3V3          -----------   1 VDD
@@ -8,11 +8,19 @@
 #   D8 : GPO     --- 10k ---   6 RA1: ICSPCLK
 #   D7 : GPO/GPI --- 10k ---   7 RA0: ICSPDAT
 #
+# Raspberry Pi Pico            Microchip PIC16F1503
+#   3V3            -----------   1 VDD
+#   GND            -----------  14 VSS
+#   GP18 : GPO     --- 10k ---   4 RA3: MCLR
+#   GP17 : GPO     --- 10k ---  12 RA1: ICSPCLK
+#   GP16 : GPO/GPI --- 10k ---  13 RA0: ICSPDAT
 
 import time
 import board
 import digitalio
-import neopixel_write
+
+if board.board_id == 'Seeeduino XIAO RP2040':
+    import neopixel_write
 
 DEVICE_LIST = {
     0x2700: {  # Device ID
@@ -21,6 +29,7 @@ DEVICE_LIST = {
         "D": [0xF000, 0x0100, 0x00FF],  # Address, Size, Value
         "N": "PIC12F1822",  # Device Name
     }
+
 }
 
 
@@ -289,12 +298,13 @@ def read_hex_file(name, memory):
     for line in file:
         line = line.rstrip()
         # Parse Record Structure
-        start_code = line[0]  #         # Start code
-        byte_count = line[1:3]  #       # Byte count
-        address = line[3:7]  #          # Address
-        record_type = line[7:9]  #      # Record type
-        data = line[9:-2]  #            # Data
-        checksum = line[-2:]  #         # Checksum
+        start_code = line[0]            # Start code
+        byte_count = line[1:3]          # Byte count
+        address = line[3:7]             # Address
+        record_type = line[7:9]         # Record type
+        data = line[9:-2]               # Data
+        checksum = line[-2:]            # Checksum
+
         # Check
         if start_code != ":":
             print("Invalid Start Code")
@@ -307,16 +317,16 @@ def read_hex_file(name, memory):
             print("Invalid Checksum")
             return
         # Handle
-        if record_type == "00":  #      # Data
+        if record_type == "00":         # Data
             absolute_address = int(extended_linear_address + address, 16) >> 1
             offset_address = absolute_address - memory_address
             if 0 <= offset_address < memory_size:
                 for i in range(0, len(data), 4):
                     value = int(data[i + 2 : i + 4] + data[i : i + 2], 16)
                     memory_buffer[offset_address + (i >> 2)] = value
-        elif record_type == "04":  #    # Extended Linear Address
+        elif record_type == "04":       # Extended Linear Address
             extended_linear_address = line[9:13]
-        elif record_type == "01":  #    # End Of File
+        elif record_type == "01":       # End Of File
             break
         else:
             print("Invalid Record Type")
@@ -325,8 +335,39 @@ def read_hex_file(name, memory):
     return memory_buffer
 
 
-class LED:
+class LED_GREEN:
+    mode = 0
 
+    def __init__(self, pin):
+        dio = digitalio.DigitalInOut(pin)
+        dio.direction = digitalio.Direction.OUTPUT
+        dio.value = True
+        self.dio = dio
+
+    def set_error(self, value):
+        self.mode = 2 if value else 1
+
+    def OFF(self):
+        self.dio.value = (self.mode == 2)
+
+    def ON_MODE(self):
+        self.dio.value = True
+        self.mode = 0
+
+    def ON_READ(self):
+        pass
+
+    def ON_ERASE(self):
+        pass
+
+    def ON_WRITE(self):
+        pass
+
+    def ON_VERIFY(self):
+        pass
+
+
+class LED_NEOPIXEL:
     mode = 0
 
     def __init__(self):
@@ -366,11 +407,19 @@ class LED:
 
 file = "image.hex"
 
-icsp = ICSP(board.D6, board.D8, board.D7)
+if board.board_id == 'Seeeduino XIAO RP2040':
+    icsp = ICSP(board.D6, board.D8, board.D7)
+    led = LED_NEOPIXEL()
+elif board.board_id == 'raspberry_pi_pico':
+    icsp = ICSP(board.GP18, board.GP17, board.GP16)
+    led = LED_GREEN(board.LED)
+else:
+    print('Invalid Board ID')
+    while True:
+        pass
+
 icsp.set_lvp_mode()
 device = read_configulation()
-
-led = LED()
 led.set_error(device is None)
 
 while True:
@@ -399,7 +448,7 @@ while True:
         device = read_configulation()
         led.set_error(device is None)
     elif device is None:
-        print("Invalid")
+        print("Unsupported Device")
     elif text == "RP":
         led.ON_READ()
         icsp.read_program_memory(device["P"][1])
@@ -438,6 +487,6 @@ while True:
         print("Data Memory")
         print_data(read_hex_file(file, device["D"]))
     else:
-        print("Invalid")
+        print("Invalid Command")
     time.sleep(0.1)
 
