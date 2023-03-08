@@ -18,6 +18,7 @@
 import time
 import board
 import digitalio
+import os
 
 if board.board_id == 'Seeeduino XIAO RP2040':
     import neopixel_write
@@ -253,6 +254,16 @@ class ICSP:
 # -----------------------------------------------------------------------------
 # Sub Routine
 
+def is_file(filename):
+    '''Return True if the file exists.
+    Because circuitpython does not have os.path.is_file()'''
+    kind_file = 32768
+    try:
+        return os.stat(filename)[0] == kind_file
+    except OSError:
+        pass
+
+    return False
 
 def hexstr(data):
     return " ".join([("%04X" % value) for value in data])
@@ -417,8 +428,6 @@ class LED_NEOPIXEL:
 # Main Routine
 
 
-file = "image.hex"
-
 if board.board_id == 'Seeeduino XIAO RP2040':
     icsp = ICSP(board.D6, board.D8, board.D7)
     led = LED_NEOPIXEL()
@@ -434,8 +443,15 @@ icsp.set_lvp_mode()
 device = read_configulation()
 led.set_error(device is None)
 
+file = "image.hex"
+
 while True:
+    if not is_file(file):
+        led.ON_MODE()
+        continue
+
     led.OFF()
+
     print("")
     print("# PIC16F1xxx LV-ICSP Programmer")
     print("MI/MO    : Enter/Exit LV-ICSP Mode                  (White)")
