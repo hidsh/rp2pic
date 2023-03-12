@@ -18,7 +18,9 @@
 import time
 import board
 import digitalio
-import os
+from os import stat
+from adafruit_datetime import datetime
+
 
 if board.board_id == 'Seeeduino XIAO RP2040':
     import neopixel_write
@@ -30,16 +32,22 @@ DEVICE_LIST = {
         "D": [0xF000, 0x0100, 0x00FF],  # Address, Size, Value
         "N": "PIC12F1822",  # Device Name
     },
+    0x1BC0: {  # Device ID
+        "P": [0x0000, 0x1000, 0x3FFF],  # Address, Size, Value
+        "C": [0x8007, 0x0002, 0x3FFF],  # Address, Size, Value
+        "D": [0xF000, 0x0100, 0x00FF],  # Address, Size, Value
+        "N": "PIC12LF1840",  # Device Name
+    },
     0x2CE0: {  # Device ID
         "P": [0x0000, 0x0800, 0x3FFF],  # Address, Size, Value
         "C": [0x8007, 0x0002, 0x3FFF],  # Address, Size, Value
-        "D": [0xF000, 0x0100, 0x00FF],  # Address, Size, Value
+        "D": [0x2000, 0x0000, 0x00FF],  # Address, Size, Value
         "N": "PIC16F1503",  # Device Name
     },
     0x2400: {  # Device ID
         "P": [0x0000, 0x0800, 0x3FFF],  # Address, Size, Value
         "C": [0x8007, 0x0002, 0x3FFF],  # Address, Size, Value
-        "D": [0xF000, 0x0100, 0x00FF],  # Address, Size, Value
+        "D": [0xF000, 0x0000, 0x00FF],  # Address, Size, Value
         "N": "PIC16F1933",  # Device Name
     },
 
@@ -180,10 +188,10 @@ class ICSP:
             data[address] = run_read_data()
             next_address = address + 1
             self.run_increment_address()
-            if not show:
+            if show == False:
                 continue
             if ((next_address % self.COLUMN) == 0) or (next_address == size):
-                column_data = data[base_address:next_address]
+                column_data = data[base_address:next_address] if show != 'config' else data[7:9]    # TODO so dirty
                 print_data_line(base_address, column_data)
                 base_address = next_address
         return data
@@ -257,11 +265,15 @@ class ICSP:
 def is_file(filename):
     '''Return True if the file exists.
     Because circuitpython does not have os.path.is_file()'''
-    kind_file = 32768
+    kind_regular_file = 32768
     try:
-        return os.stat(filename)[0] == kind_file
+        sts = stat(filename)
     except OSError:
         pass
+
+    if sts[0] == kind_regular_file:
+        dt = datetime.fromtimestamp(sts[8])
+        return f'{dt.year}-{dt.month}-{dt.day} {dt.hour}:{dt.minute}:{dt.second}' 
 
     return False
 
@@ -284,7 +296,7 @@ def verify_data(memory, config, read_data):
     print_data(data_file)
     print("Read Data")
     if config:
-        data_read = icsp.read_configulation(11)[7:9]
+        data_read = icsp.read_configulation(11, "config")[7:9]
     else:
         data_read = read_data(memory[1])
     if data_file == data_read:
@@ -315,7 +327,7 @@ def read_hex_file(name, memory):
     memory_address = memory[0]
     memory_size = memory[1]
     memory_buffer = [memory[2]] * memory_size
-    extended_linear_address = 0
+    extended_linear_address = '0000'
     # Read File
     file = open(name, "r")
     for line in file:
@@ -327,6 +339,8 @@ def read_hex_file(name, memory):
         record_type = line[7:9]         # Record type
         data = line[9:-2]               # Data
         checksum = line[-2:]            # Checksum
+        #if len(data) == 4: #debug
+        #    print(f'debug data:{data}')
 
         # Check
         if start_code != ":":
@@ -336,25 +350,33 @@ def read_hex_file(name, memory):
             print("Invalid Data Length")
             return
         byte_data = [int(line[i : i + 2], 16) for i in range(1, len(line), 2)]
-        if sum(byte_data) & 0xFF:
+        if sum(byte_data) & 0xFF:   # todo diff byte_data vs checksum
             print("Invalid Checksum")
             return
         # Handle
         if record_type == "00":         # Data
+            # print(f"{extended_linear_address}, {address}") # debug
             absolute_address = int(extended_linear_address + address, 16) >> 1
             offset_address = absolute_address - memory_address
             if 0 <= offset_address < memory_size:
                 for i in range(0, len(data), 4):
+                    #if len(memory_buffer) == 2: #debug
+                    #    print(f'debug data:{data}')
                     value = int(data[i + 2 : i + 4] + data[i : i + 2], 16)
                     memory_buffer[offset_address + (i >> 2)] = value
         elif record_type == "04":       # Extended Linear Address
             extended_linear_address = line[9:13]
+        elif record_type == "02":       # Extended Segment address
+            # TODO: ignored temporary
+            continue
         elif record_type == "01":       # End Of File
             break
         else:
-            print("Invalid Record Type")
+            print(f"Invalid Record Type:{record_type}")
             return
     file.close()
+    #if len(memory_buffer) == 2:     #debug
+        #print(f'debug memory_buffer:{memory_buffer}')
     return memory_buffer
 
 
@@ -378,15 +400,19 @@ class LED_GREEN:
         self.mode = 0
 
     def ON_READ(self):
+        self.dio.value = True
         pass
 
     def ON_ERASE(self):
+        self.dio.value = True
         pass
 
     def ON_WRITE(self):
+        self.dio.value = True
         pass
 
     def ON_VERIFY(self):
+        self.dio.value = True
         pass
 
 
@@ -435,7 +461,7 @@ elif board.board_id == 'raspberry_pi_pico':
     icsp = ICSP(board.GP18, board.GP17, board.GP16)
     led = LED_GREEN(board.LED)
 else:
-    print('Invalid Board ID')
+    print(f'Invalid Board ID:{board.board_id}')
     while True:
         pass
 
@@ -443,14 +469,16 @@ icsp.set_lvp_mode()
 device = read_configulation()
 led.set_error(device is None)
 
-file = "image.hex"
+file = "pic.hex"
 
 while True:
-    if not is_file(file):
+    if not (timestamp:=is_file(file)):
         led.ON_MODE()
         continue
 
     led.OFF()
+    print()
+    print(f'file:{file}\t{timestamp}')
 
     print("")
     print("# PIC16F1xxx LV-ICSP Programmer")
@@ -492,6 +520,13 @@ while True:
     elif text == "WP":
         led.ON_WRITE()
         icsp.write_program_memory(read_hex_file(file, device["P"]))
+        # TODO do not overwrite configuration word
+        # なぜかWPでconfiguration wordを書くとおかしくなる(WPのあとでWCで書くと問題ない)
+        #  File Data
+        #    0000: 39E4 3FFF
+        #  Read Data
+        #    0000: 3FFF 3FFF <--!!
+        # 最悪 :02 0000 04 0001 F9 から次の:02 0000 04 0001以外 まで無視するとか)
     elif text == "WD":
         led.ON_WRITE()
         icsp.write_data_memory(read_hex_file(file, device["D"]))
@@ -508,12 +543,19 @@ while True:
         led.ON_VERIFY()
         verify_data(device["C"], True, None)
     elif text == "TF":
-        print("Program Memory")
-        print_data(read_hex_file(file, device["P"]))
-        print("Configuration Memory")
-        print_data(read_hex_file(file, device["C"]))
-        print("Data Memory")
-        print_data(read_hex_file(file, device["D"]))
+        data = read_hex_file(file, device["P"])
+        if not data: continue
+        print("Program Memory");        print_data(data)
+        
+        data = read_hex_file(file, device["C"])
+        if not data: continue
+        print("Configuration Memory");  print_data(data)
+        
+        data = read_hex_file(file, device["D"])
+        if not data: continue
+        print("Data Memory");           print_data(data)
+    elif text == "":
+        pass
     else:
         print("Invalid Command")
     time.sleep(0.1)
