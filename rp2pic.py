@@ -50,7 +50,6 @@ DEVICE_LIST = {
         "D": [0xF000, 0x0000, 0x00FF],  # Address, Size, Value
         "N": "PIC16F1933",  # Device Name
     },
-
 }
 
 
@@ -59,7 +58,6 @@ DEVICE_LIST = {
 
 
 class ICSP:
-
     WAIT_TCLK = 200e-9  # 200 ns
     WAIT_TDLY = 1e-6  # 1 us
     WAIT_TENT = 1e-3  # 1 ms
@@ -188,7 +186,7 @@ class ICSP:
             data[address] = run_read_data()
             next_address = address + 1
             self.run_increment_address()
-            if show == False:
+            if show is False:
                 continue
             if ((next_address % self.COLUMN) == 0) or (next_address == size):
                 column_data = data[base_address:next_address] if show != 'config' else data[7:9]    # TODO so dirty
@@ -201,7 +199,7 @@ class ICSP:
         self.run_reset_address()
         return self.read_memory(size, run_read_data)
 
-    def read_configulation(self, size, show=True):
+    def read_configuration(self, size, show=True):
         run_read_data = self.run_read_data_from_program_memory
         self.run_load_configuration()
         return self.read_memory(size, run_read_data, show)
@@ -262,9 +260,9 @@ class ICSP:
 # -----------------------------------------------------------------------------
 # Sub Routine
 
-def is_file(filename):
-    '''Return True if the file exists.
-    Because circuitpython does not have os.path.is_file()'''
+def get_timestamp(filename):
+    '''Return string yyyy-mm-dd HH:MM:SS from mtime of FILENAME if file exists.
+    As subsutitute of os.path.is_file because circuitpython does not have it'''
     kind_regular_file = 32768
     try:
         sts = stat(filename)
@@ -273,7 +271,7 @@ def is_file(filename):
 
     if sts[0] == kind_regular_file:
         dt = datetime.fromtimestamp(sts[8])
-        return f'{dt.year}-{dt.month}-{dt.day} {dt.hour}:{dt.minute}:{dt.second}' 
+        return f'{dt.year}-{dt.month}-{dt.day} {dt.hour}:{dt.minute}:{dt.second}'
 
     return False
 
@@ -282,7 +280,7 @@ def hexstr(data):
 
 
 def print_data_line(address, data):
-    print(("%04X:" % address), hexstr(data))
+    prinp(("%04X:" % address), hexstr(data))
 
 
 def print_data(data):
@@ -291,22 +289,24 @@ def print_data(data):
 
 
 def verify_data(memory, config, read_data):
-    print("File Data")
+    prinp("File Data")
     data_file = read_hex_file(file, memory)
     print_data(data_file)
-    print("Read Data")
+    prinp("Read Data")
     if config:
-        data_read = icsp.read_configulation(11, "config")[7:9]
+        data_read = icsp.read_configuration(11, "config")[7:9]
     else:
         data_read = read_data(memory[1])
     if data_file == data_read:
-        print("Verify OK")
+        prinp("Verify OK")
+        return None
     else:
-        print("Verify NG")
+        prinp("Verify NG")
+        return -1    # error
 
 
-def read_configulation():
-    data = icsp.read_configulation(11, False)
+def read_configuration():
+    data = icsp.read_configuration(11, False)
     device_id = data[6] & 0x3FE0
     device_infomation = DEVICE_LIST.get(device_id)
     if device_infomation is None:
@@ -314,12 +314,12 @@ def read_configulation():
     else:
         device_name = "(" + device_infomation["N"] + ")"
     # Print
-    print("# Configuration")
-    print("User ID Location   :", hexstr(data[0:4]))
-    print("Device ID          :", hexstr([device_id]), device_name)
-    print("Revision ID        :", hexstr([data[6] & 0x1F]))
-    print("Configuration Word :", hexstr(data[7:9]))
-    print("Calibration Word   :", hexstr(data[9:11]))
+    prinp("# Configuration")
+    prinp("User ID Location   :", hexstr(data[0:4]))
+    prinp("Device ID          :", hexstr([device_id]), device_name)
+    prinp("Revision ID        :", hexstr([data[6] & 0x1F]))
+    prinp("Configuration Word :", hexstr(data[7:9]))
+    prinp("Calibration Word   :", hexstr(data[9:11]))
     return device_infomation
 
 
@@ -339,29 +339,29 @@ def read_hex_file(name, memory):
         record_type = line[7:9]         # Record type
         data = line[9:-2]               # Data
         checksum = line[-2:]            # Checksum
-        #if len(data) == 4: #debug
-        #    print(f'debug data:{data}')
+        # if len(data) == 4: #debug
+        #    prinp(f'debug data:{data}')
 
         # Check
         if start_code != ":":
-            print("Invalid Start Code")
+            prinp("Invalid Start Code")
             return
         if (int(byte_count, 16) * 2) != len(data):
-            print("Invalid Data Length")
+            prinp("Invalid Data Length")
             return
         byte_data = [int(line[i : i + 2], 16) for i in range(1, len(line), 2)]
         if sum(byte_data) & 0xFF:   # todo diff byte_data vs checksum
-            print("Invalid Checksum")
+            prinp("Invalid Checksum")
             return
         # Handle
         if record_type == "00":         # Data
-            # print(f"{extended_linear_address}, {address}") # debug
+            # prinp(f"{extended_linear_address}, {address}") # debug
             absolute_address = int(extended_linear_address + address, 16) >> 1
             offset_address = absolute_address - memory_address
             if 0 <= offset_address < memory_size:
                 for i in range(0, len(data), 4):
-                    #if len(memory_buffer) == 2: #debug
-                    #    print(f'debug data:{data}')
+                    # if len(memory_buffer) == 2: #debug
+                    #    prinp(f'debug data:{data}')
                     value = int(data[i + 2 : i + 4] + data[i : i + 2], 16)
                     memory_buffer[offset_address + (i >> 2)] = value
         elif record_type == "04":       # Extended Linear Address
@@ -372,15 +372,15 @@ def read_hex_file(name, memory):
         elif record_type == "01":       # End Of File
             break
         else:
-            print(f"Invalid Record Type:{record_type}")
+            prinp(f"Invalid Record Type:{record_type}")
             return
     file.close()
-    #if len(memory_buffer) == 2:     #debug
-        #print(f'debug memory_buffer:{memory_buffer}')
+    # if len(memory_buffer) == 2:     #debug
+    #    prinp(f'debug memory_buffer:{memory_buffer}')
     return memory_buffer
 
 
-class LED_GREEN:
+class LED_MONO:
     mode = 0
 
     def __init__(self, pin):
@@ -388,12 +388,16 @@ class LED_GREEN:
         dio.direction = digitalio.Direction.OUTPUT
         dio.value = True
         self.dio = dio
+        self.OFF()
 
     def set_error(self, value):
         self.mode = 2 if value else 1
 
     def OFF(self):
         self.dio.value = (self.mode == 2)
+
+    def ON(self):
+        self.dio.value = True
 
     def ON_MODE(self):
         self.dio.value = True
@@ -450,47 +454,151 @@ class LED_NEOPIXEL:
         neopixel_write.neopixel_write(self.DAT, bytearray([0x20, 0x00, 0x20]))
 
 
+
+can_print = True
+def prinp(*objs, sep='', end='\n'):
+    if can_print is False:
+       return
+    print(*objs, sep=sep, end=end)
+
+def show_help():
+    if can_print is False: return
+
+    print()
+    print("# PIC16F1xxx LV-ICSP Programmer")
+    print(   f'Auto Prog: {"Yes" if auto_prog else "No"}')
+    print(   f'File     : {file}\t{timestamp or ""}')
+    print()
+    prinp(    "MI/MO    : Enter/Exit LV-ICSP Mode                  (White)")
+    if device:
+        prinp("RP/RD/RC : Read   Program/Data/Configuration Memory (Green)")
+        prinp("EP/ED    : Erase  Program/Data               Memory (Yellow)")
+        prinp("WP/WD/WC : Write  Program/Data/Configuration Memory (Red)")
+        prinp("VP/VD/VC : Verify Program/Data/Configuration Memory (Cyan)")
+    else:
+        prinp("RC       : Read Configuration Memory                (Green)")
+
+class LVP_Mode:
+    def __enter__(self):
+        icsp.set_lvp_mode()
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        icsp.set_normal_mode()
+
+class NO_Printer:
+    def __init__(self):
+        try:
+            self.verbose_bak = verbose
+        except NameError:
+            self.verbose_bak = False
+
+    def __enter__(self):
+        verbose = False
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        global verbose
+        verbose = self.verbose_bak
+
+def proc_auto_prog():
+    print('WP', end=', ')
+    led.ON_WRITE()
+    icsp.write_program_memory(read_hex_file(file, device["P"]))     # WP
+
+    print('VP', end=', ')
+    led.ON_VERIFY()
+    if(verify_data(device["P"], False, icsp.read_program_memory)):  # VP
+       return 'Error: Program memory'
+
+    if device["D"][1] > 0:      # check data memory size
+        print('WD', end=', ')
+        led.ON_WRITE()
+        icsp.write_data_memory(read_hex_file(file, device["D"]))        # WD
+
+        print('VD', end=', ')
+        led.ON_VERIFY()
+        if(verify_data(device["D"], False, icsp.read_data_memory)):     # VD
+           return 'Error: Data memory'
+
+    print('WC', end=', ')
+    led.ON_WRITE()
+    icsp.write_configulation(read_hex_file(file, device["C"]))          # WC
+
+    print('VC', end=', ')
+    led.ON_VERIFY()
+    if(verify_data(device["C"], True, None)):                           # VC
+       return 'Error: Config memory'
+
+    return None    # None: success
+
+
 # -----------------------------------------------------------------------------
 # Main Routine
 
-
 if board.board_id == 'Seeeduino XIAO RP2040':
-    icsp = ICSP(board.D6, board.D8, board.D7)
+    PIN_ICSP_MCLR = board.D6
+    PIN_ICSP_CLK = board.D8
+    PIN_ICSP_DAT = board.D7
+    PIN_SW_AUTO = board.D5
+    led_error = LED_MONO(board.D4)
     led = LED_NEOPIXEL()
 elif board.board_id == 'raspberry_pi_pico':
-    icsp = ICSP(board.GP18, board.GP17, board.GP16)
-    led = LED_GREEN(board.LED)
+    PIN_ICSP_MCLR = board.GP18
+    PIN_ICSP_CLK = board.GP17
+    PIN_ICSP_DAT = board.GP16
+    PIN_SW_AUTO = board.GP19
+    led_error = LED_MONO(board.GP15)
+    led = LED_MONO(board.LED)
 else:
-    print(f'Invalid Board ID:{board.board_id}')
+    prinp(f'Unsuppored Board ID:{board.board_id}')
     while True:
         pass
 
-icsp.set_lvp_mode()
-device = read_configulation()
-led.set_error(device is None)
+icsp = ICSP(PIN_ICSP_MCLR, PIN_ICSP_CLK, PIN_ICSP_DAT)
+
+# Enable Automatic programming?
+SW = digitalio.DigitalInOut(PIN_SW_AUTO)
+SW.direction = digitalio.Direction.INPUT
+SW.pull = digitalio.Pull.UP
+
+auto_prog = not SW.value    # Press (LOW) --> Auto prog:ON
+can_print = not auto_prog   # no print when Auto prog
 
 file = "pic.hex"
+led.set_error(0)
+led.OFF()
+led_error.OFF()
 
 while True:
-    if not (timestamp:=is_file(file)):
-        led.ON_MODE()
-        continue
+    while not (timestamp := get_timestamp(file)):
+        time.sleep(0.2)
 
-    led.OFF()
-    print()
-    print(f'file:{file}\t{timestamp}')
+    device = None
+    while not device:
+        led.set_error(1)
+        with LVP_Mode():
+            device = read_configuration()
+        time.sleep(0.2)
 
-    print("")
-    print("# PIC16F1xxx LV-ICSP Programmer")
-    print("MI/MO    : Enter/Exit LV-ICSP Mode                  (White)")
-    if device:
-        print("RP/RD/RC : Read   Program/Data/Configuration Memory (Green)")
-        print("EP/ED    : Erase  Program/Data               Memory (Yellow)")
-        print("WP/WD/WC : Write  Program/Data/Configuration Memory (Red)")
-        print("VP/VD/VC : Verify Program/Data/Configuration Memory (Cyan)")
-    else:
-        print("RC       : Read Configuration Memory                (Green)")
-    print("> ", end="")
+    if auto_prog:
+        print(f'Programming {file}...', end='')
+        with LVP_Mode():
+            result = proc_auto_prog()
+
+        if result:
+            print('Failed')
+            led.set_error(2)
+            led_error.ON()
+        else:
+            print('Done')
+            led.set_error(0)
+            led.OFF()
+
+        while True:
+            time.sleep(1)        # wait updating file content or reset
+
+    # command mode
+    show_help()
+    prinp("> ", end="")
     text = input().upper()
     if text == "MI":
         led.ON_MODE()
@@ -500,11 +608,10 @@ while True:
         icsp.set_normal_mode()
         device = None
     elif text == "RC":
-        led.ON_READ()
-        device = read_configulation()
-        led.set_error(device is None)
-    elif device is None:
-        print("Unsupported Device")
+        with LVP_Mode():
+            led.ON_READ()
+            device = read_configuration()
+            led.set_error(device is None)
     elif text == "RP":
         led.ON_READ()
         icsp.read_program_memory(device["P"][1])
@@ -545,18 +652,18 @@ while True:
     elif text == "TF":
         data = read_hex_file(file, device["P"])
         if not data: continue
-        print("Program Memory");        print_data(data)
-        
+        prinp("Program Memory");        print_data(data)
+
         data = read_hex_file(file, device["C"])
         if not data: continue
-        print("Configuration Memory");  print_data(data)
-        
+        prinp("Configuration Memory");  print_data(data)
+
         data = read_hex_file(file, device["D"])
         if not data: continue
-        print("Data Memory");           print_data(data)
+        prinp("Data Memory");           print_data(data)
     elif text == "":
         pass
     else:
-        print("Invalid Command")
+        prinp("Invalid Command")
     time.sleep(0.1)
 
