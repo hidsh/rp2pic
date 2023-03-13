@@ -18,7 +18,7 @@
 import time
 import board
 import digitalio
-from os import stat
+from os import stat, listdir
 from adafruit_datetime import datetime
 
 
@@ -530,6 +530,17 @@ def proc_auto_prog():
 
     return None    # None: success
 
+def list_hex_file():
+    return list(filter(lambda x: len(x) > 5 and x[-4:] == '.hex', listdir()))
+
+def get_latest_hex():
+    hexs = list_hex_file()
+    if hexs:
+        tstamps = [(x, stat(x)[8]) for x in hexs]
+        max_idx = tstamps.index(max(tstamps))
+        return (hexs[max_idx], tstamps[max_idx])
+    else:
+        return (None, None)
 
 # -----------------------------------------------------------------------------
 # Main Routine
@@ -563,13 +574,14 @@ SW.pull = digitalio.Pull.UP
 auto_prog = not SW.value    # Press (LOW) --> Auto prog:ON
 can_print = not auto_prog   # no print when Auto prog
 
-file = "pic.hex"
 led.set_error(0)
 led.OFF()
 led_error.OFF()
 
+file = ''
 while True:
-    while not (timestamp := get_timestamp(file)):
+    while not file:
+        file, tstamp = get_latest_hex()
         time.sleep(0.2)
 
     device = None
