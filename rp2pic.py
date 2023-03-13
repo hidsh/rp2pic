@@ -260,21 +260,6 @@ class ICSP:
 # -----------------------------------------------------------------------------
 # Sub Routine
 
-def get_timestamp(filename):
-    '''Return string yyyy-mm-dd HH:MM:SS from mtime of FILENAME if file exists.
-    As subsutitute of os.path.is_file because circuitpython does not have it'''
-    kind_regular_file = 32768
-    try:
-        sts = stat(filename)
-    except OSError:
-        pass
-
-    if sts[0] == kind_regular_file:
-        dt = datetime.fromtimestamp(sts[8])
-        return f'{dt.year}-{dt.month}-{dt.day} {dt.hour}:{dt.minute}:{dt.second}'
-
-    return False
-
 def hexstr(data):
     return " ".join([("%04X" % value) for value in data])
 
@@ -467,7 +452,7 @@ def show_help():
     print()
     print("# PIC16F1xxx LV-ICSP Programmer")
     print(   f'Auto Prog: {"Yes" if auto_prog else "No"}')
-    print(   f'File     : {hex_file}\t{timestamp or ""}')
+    print(   f'File     : {hex_file}\t{tstamp or ""}')
     print()
     prinp(    "MI/MO    : Enter/Exit LV-ICSP Mode                  (White)")
     if device:
@@ -530,15 +515,20 @@ def proc_auto_prog():
 
     return None    # None: success
 
+def fmt_time(time):
+    dt = datetime.fromtimestamp(time)
+    return f'{dt.year}-{dt.month}-{dt.day} {dt.hour}:{dt.minute}:{dt.second}'
+
 def list_hex_file():
     return filter(lambda x: len(x) > 5 and x[-4:].lower() == '.hex', listdir())
 
 def get_latest_hex():
     hexs = list(list_hex_file())
     if hexs:
-        tstamps = [(x, stat(x)[8]) for x in hexs]
+        tstamps = [stat(x)[8] for x in hexs]
         max_idx = tstamps.index(max(tstamps))
-        return (hexs[max_idx], tstamps[max_idx])
+        print(tstamps[max_idx])
+        return (hexs[max_idx], fmt_time(tstamps[max_idx]))
     else:
         return (None, None)
 
@@ -620,25 +610,30 @@ while True:
         icsp.set_normal_mode()
         device = None
     elif text == "RC":
+        led.ON_READ()
         with LVP_Mode():
-            led.ON_READ()
             device = read_configuration()
-            led.set_error(device is None)
+        led.set_error(device is None)
     elif text == "RP":
         led.ON_READ()
-        icsp.read_program_memory(device["P"][1])
+        with LVP_Mode():
+            icsp.read_program_memory(device["P"][1])
     elif text == "RD":
         led.ON_READ()
-        icsp.read_data_memory(device["D"][1])
+        with LVP_Mode():
+            icsp.read_data_memory(device["D"][1])
     elif text == "EP":
         led.ON_ERASE()
-        icsp.erase_program_memory()
+        with LVP_Mode():
+            icsp.erase_program_memory()
     elif text == "ED":
         led.ON_ERASE()
-        icsp.erase_data_memory()
+        with LVP_Mode():
+            icsp.erase_data_memory()
     elif text == "WP":
         led.ON_WRITE()
-        icsp.write_program_memory(read_hex_file(hex_file, device["P"]))
+        with LVP_Mode():
+            icsp.write_program_memory(read_hex_file(hex_file, device["P"]))
         # TODO do not overwrite configuration word
         # なぜかWPでconfiguration wordを書くとおかしくなる(WPのあとでWCで書くと問題ない)
         #  File Data
@@ -648,19 +643,24 @@ while True:
         # 最悪 :02 0000 04 0001 F9 から次の:02 0000 04 0001以外 まで無視するとか)
     elif text == "WD":
         led.ON_WRITE()
-        icsp.write_data_memory(read_hex_file(hex_file, device["D"]))
+        with LVP_Mode():
+            icsp.write_data_memory(read_hex_file(hex_file, device["D"]))
     elif text == "WC":
         led.ON_WRITE()
-        icsp.write_configulation(read_hex_file(hex_file, device["C"]))
+        with LVP_Mode():
+            icsp.write_configulation(read_hex_file(hex_file, device["C"]))
     elif text == "VP":
         led.ON_VERIFY()
-        verify_data(device["P"], False, icsp.read_program_memory)
+        with LVP_Mode():
+            verify_data(device["P"], False, icsp.read_program_memory)
     elif text == "VD":
         led.ON_VERIFY()
-        verify_data(device["D"], False, icsp.read_data_memory)
+        with LVP_Mode():
+            verify_data(device["D"], False, icsp.read_data_memory)
     elif text == "VC":
         led.ON_VERIFY()
-        verify_data(device["C"], True, None)
+        with LVP_Mode():
+            verify_data(device["C"], True, None)
     elif text == "TF":
         data = read_hex_file(hex_file, device["P"])
         if not data: continue
