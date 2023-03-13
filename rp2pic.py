@@ -290,7 +290,7 @@ def print_data(data):
 
 def verify_data(memory, config, read_data):
     prinp("File Data")
-    data_file = read_hex_file(file, memory)
+    data_file = read_hex_file(hex_file, memory)
     print_data(data_file)
     prinp("Read Data")
     if config:
@@ -467,7 +467,7 @@ def show_help():
     print()
     print("# PIC16F1xxx LV-ICSP Programmer")
     print(   f'Auto Prog: {"Yes" if auto_prog else "No"}')
-    print(   f'File     : {file}\t{timestamp or ""}')
+    print(   f'File     : {hex_file}\t{timestamp or ""}')
     print()
     prinp(    "MI/MO    : Enter/Exit LV-ICSP Mode                  (White)")
     if device:
@@ -502,7 +502,7 @@ class NO_Printer:
 def proc_auto_prog():
     print('WP', end=', ')
     led.ON_WRITE()
-    icsp.write_program_memory(read_hex_file(file, device["P"]))     # WP
+    icsp.write_program_memory(read_hex_file(hex_file, device["P"]))     # WP
 
     print('VP', end=', ')
     led.ON_VERIFY()
@@ -512,7 +512,7 @@ def proc_auto_prog():
     if device["D"][1] > 0:      # check data memory size
         print('WD', end=', ')
         led.ON_WRITE()
-        icsp.write_data_memory(read_hex_file(file, device["D"]))        # WD
+        icsp.write_data_memory(read_hex_file(hex_file, device["D"]))        # WD
 
         print('VD', end=', ')
         led.ON_VERIFY()
@@ -521,7 +521,7 @@ def proc_auto_prog():
 
     print('WC', end=', ')
     led.ON_WRITE()
-    icsp.write_configulation(read_hex_file(file, device["C"]))          # WC
+    icsp.write_configulation(read_hex_file(hex_file, device["C"]))          # WC
 
     print('VC', end=', ')
     led.ON_VERIFY()
@@ -531,10 +531,10 @@ def proc_auto_prog():
     return None    # None: success
 
 def list_hex_file():
-    return list(filter(lambda x: len(x) > 5 and x[-4:] == '.hex', listdir()))
+    return filter(lambda x: len(x) > 5 and x[-4:].lower() == '.hex', listdir())
 
 def get_latest_hex():
-    hexs = list_hex_file()
+    hexs = list(list_hex_file())
     if hexs:
         tstamps = [(x, stat(x)[8]) for x in hexs]
         max_idx = tstamps.index(max(tstamps))
@@ -566,7 +566,7 @@ else:
 
 icsp = ICSP(PIN_ICSP_MCLR, PIN_ICSP_CLK, PIN_ICSP_DAT)
 
-# Enable Automatic programming?
+# Automatic programming?
 SW = digitalio.DigitalInOut(PIN_SW_AUTO)
 SW.direction = digitalio.Direction.INPUT
 SW.pull = digitalio.Pull.UP
@@ -578,10 +578,10 @@ led.set_error(0)
 led.OFF()
 led_error.OFF()
 
-file = ''
+hex_file = ''
 while True:
-    while not file:
-        file, tstamp = get_latest_hex()
+    while not hex_file:
+        hex_file, tstamp = get_latest_hex()
         time.sleep(0.2)
 
     device = None
@@ -592,7 +592,7 @@ while True:
         time.sleep(0.2)
 
     if auto_prog:
-        print(f'Programming {file}...', end='')
+        print(f'Programming {hex_file}...', end='')
         with LVP_Mode():
             result = proc_auto_prog()
 
@@ -606,9 +606,9 @@ while True:
             led.OFF()
 
         while True:
-            time.sleep(1)        # wait updating file content or reset
+            time.sleep(1)        # wait updating files content or reset
 
-    # command mode
+    # Manual programming
     show_help()
     prinp("> ", end="")
     text = input().upper()
@@ -638,7 +638,7 @@ while True:
         icsp.erase_data_memory()
     elif text == "WP":
         led.ON_WRITE()
-        icsp.write_program_memory(read_hex_file(file, device["P"]))
+        icsp.write_program_memory(read_hex_file(hex_file, device["P"]))
         # TODO do not overwrite configuration word
         # なぜかWPでconfiguration wordを書くとおかしくなる(WPのあとでWCで書くと問題ない)
         #  File Data
@@ -648,10 +648,10 @@ while True:
         # 最悪 :02 0000 04 0001 F9 から次の:02 0000 04 0001以外 まで無視するとか)
     elif text == "WD":
         led.ON_WRITE()
-        icsp.write_data_memory(read_hex_file(file, device["D"]))
+        icsp.write_data_memory(read_hex_file(hex_file, device["D"]))
     elif text == "WC":
         led.ON_WRITE()
-        icsp.write_configulation(read_hex_file(file, device["C"]))
+        icsp.write_configulation(read_hex_file(hex_file, device["C"]))
     elif text == "VP":
         led.ON_VERIFY()
         verify_data(device["P"], False, icsp.read_program_memory)
@@ -662,15 +662,15 @@ while True:
         led.ON_VERIFY()
         verify_data(device["C"], True, None)
     elif text == "TF":
-        data = read_hex_file(file, device["P"])
+        data = read_hex_file(hex_file, device["P"])
         if not data: continue
         prinp("Program Memory");        print_data(data)
 
-        data = read_hex_file(file, device["C"])
+        data = read_hex_file(hex_file, device["C"])
         if not data: continue
         prinp("Configuration Memory");  print_data(data)
 
-        data = read_hex_file(file, device["D"])
+        data = read_hex_file(hex_file, device["D"])
         if not data: continue
         prinp("Data Memory");           print_data(data)
     elif text == "":
