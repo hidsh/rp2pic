@@ -27,28 +27,28 @@ if board.board_id == 'Seeeduino XIAO RP2040':
 
 DEVICE_LIST = {
     0x2700: {  # Device ID
-        "P": [0x0000, 0x0800, 0x3FFF],  # Address, Size, Value
-        "C": [0x8007, 0x0002, 0x3FFF],  # Address, Size, Value
-        "D": [0xF000, 0x0100, 0x00FF],  # Address, Size, Value
-        "N": "PIC12F1822",  # Device Name
+        'P': [0x0000, 0x0800, 0x3FFF],  # Address, Size, Value
+        'C': [0x8007, 0x0002, 0x3FFF],  # Address, Size, Value
+        'D': [0xF000, 0x0100, 0x00FF],  # Address, Size, Value
+        'N': 'PIC12F1822',  # Device Name
     },
     0x1BC0: {  # Device ID
-        "P": [0x0000, 0x1000, 0x3FFF],  # Address, Size, Value
-        "C": [0x8007, 0x0002, 0x3FFF],  # Address, Size, Value
-        "D": [0xF000, 0x0100, 0x00FF],  # Address, Size, Value
-        "N": "PIC12LF1840",  # Device Name
+        'P': [0x0000, 0x1000, 0x3FFF],  # Address, Size, Value
+        'C': [0x8007, 0x0002, 0x3FFF],  # Address, Size, Value
+        'D': [0xF000, 0x0100, 0x00FF],  # Address, Size, Value
+        'N': 'PIC12LF1840',  # Device Name
     },
     0x2CE0: {  # Device ID
-        "P": [0x0000, 0x0800, 0x3FFF],  # Address, Size, Value
-        "C": [0x8007, 0x0002, 0x3FFF],  # Address, Size, Value
-        "D": [0x2000, 0x0000, 0x00FF],  # Address, Size, Value
-        "N": "PIC16F1503",  # Device Name
+        'P': [0x0000, 0x0800, 0x3FFF],  # Address, Size, Value
+        'C': [0x8007, 0x0002, 0x3FFF],  # Address, Size, Value
+        'D': [0x2000, 0x0000, 0x00FF],  # Address, Size, Value
+        'N': 'PIC16F1503',  # Device Name
     },
     0x2400: {  # Device ID
-        "P": [0x0000, 0x0800, 0x3FFF],  # Address, Size, Value
-        "C": [0x8007, 0x0002, 0x3FFF],  # Address, Size, Value
-        "D": [0xF000, 0x0000, 0x00FF],  # Address, Size, Value
-        "N": "PIC16F1933",  # Device Name
+        'P': [0x0000, 0x0800, 0x3FFF],  # Address, Size, Value
+        'C': [0x8007, 0x0002, 0x3FFF],  # Address, Size, Value
+        'D': [0xF000, 0x0000, 0x00FF],  # Address, Size, Value
+        'N': 'PIC16F1933',  # Device Name
     },
 }
 
@@ -261,11 +261,11 @@ class ICSP:
 # Sub Routine
 
 def hexstr(data):
-    return " ".join([("%04X" % value) for value in data])
+    return ' '.join([('%04X' % value) for value in data])
 
 
 def print_data_line(address, data):
-    prinp(("%04X:" % address), hexstr(data))
+    prinp(('%04X:' % address), hexstr(data))
 
 
 def print_data(data):
@@ -274,19 +274,19 @@ def print_data(data):
 
 
 def verify_data(memory, config, read_data):
-    prinp("File Data")
+    prinp('File Data')
     data_file = read_hex_file(hex_file, memory)
     print_data(data_file)
-    prinp("Read Data")
+    prinp('Read Data')
     if config:
-        data_read = icsp.read_configuration(11, "config")[7:9]
+        data_read = icsp.read_configuration(11, 'config')[7:9]
     else:
         data_read = read_data(memory[1])
     if data_file == data_read:
-        prinp("Verify OK")
+        prinp('Verify OK')
         return None
     else:
-        prinp("Verify NG")
+        prinp('Verify NG')
         return -1    # error
 
 
@@ -295,16 +295,16 @@ def read_configuration():
     device_id = data[6] & 0x3FE0
     device_infomation = DEVICE_LIST.get(device_id)
     if device_infomation is None:
-        device_name = "(Not Supported)"
+        device_name = '(Not Supported)'
     else:
-        device_name = "(" + device_infomation["N"] + ")"
+        device_name = '(' + device_infomation['N'] + ')'
     # Print
-    prinp("# Configuration")
-    prinp("User ID Location   :", hexstr(data[0:4]))
-    prinp("Device ID          :", hexstr([device_id]), device_name)
-    prinp("Revision ID        :", hexstr([data[6] & 0x1F]))
-    prinp("Configuration Word :", hexstr(data[7:9]))
-    prinp("Calibration Word   :", hexstr(data[9:11]))
+    prinp('# Configuration')
+    prinp('User ID Location   :', hexstr(data[0:4]))
+    prinp('Device ID          :', hexstr([device_id]), device_name)
+    prinp('Revision ID        :', hexstr([data[6] & 0x1F]))
+    prinp('Configuration Word :', hexstr(data[7:9]))
+    prinp('Calibration Word   :', hexstr(data[9:11]))
     return device_infomation
 
 
@@ -314,7 +314,7 @@ def read_hex_file(name, memory):
     memory_buffer = [memory[2]] * memory_size
     extended_linear_address = '0000'
     # Read File
-    file = open(name, "r")
+    file = open(name, 'r')
     for line in file:
         line = line.rstrip()
         # Parse Record Structure
@@ -328,19 +328,19 @@ def read_hex_file(name, memory):
         #    prinp(f'debug data:{data}')
 
         # Check
-        if start_code != ":":
-            prinp("Invalid Start Code")
+        if start_code != ':':
+            prinp('Invalid Start Code')
             return
         if (int(byte_count, 16) * 2) != len(data):
-            prinp("Invalid Data Length")
+            prinp('Invalid Data Length')
             return
         byte_data = [int(line[i : i + 2], 16) for i in range(1, len(line), 2)]
         if sum(byte_data) & 0xFF:   # todo diff byte_data vs checksum
-            prinp("Invalid Checksum")
+            prinp('Invalid Checksum')
             return
         # Handle
-        if record_type == "00":         # Data
-            # prinp(f"{extended_linear_address}, {address}") # debug
+        if record_type == '00':         # Data
+            # prinp(f'{extended_linear_address}, {address}') # debug
             absolute_address = int(extended_linear_address + address, 16) >> 1
             offset_address = absolute_address - memory_address
             if 0 <= offset_address < memory_size:
@@ -349,15 +349,15 @@ def read_hex_file(name, memory):
                     #    prinp(f'debug data:{data}')
                     value = int(data[i + 2 : i + 4] + data[i : i + 2], 16)
                     memory_buffer[offset_address + (i >> 2)] = value
-        elif record_type == "04":       # Extended Linear Address
+        elif record_type == '04':       # Extended Linear Address
             extended_linear_address = line[9:13]
-        elif record_type == "02":       # Extended Segment address
+        elif record_type == '02':       # Extended Segment address
             # TODO: ignored temporary
             continue
-        elif record_type == "01":       # End Of File
+        elif record_type == '01':       # End Of File
             break
         else:
-            prinp(f"Invalid Record Type:{record_type}")
+            prinp(f'Invalid Record Type:{record_type}')
             return
     file.close()
     # if len(memory_buffer) == 2:     #debug
@@ -455,18 +455,18 @@ def prinp(*objs, sep='', end='\n'):
 
 def print_help():
     print()
-    print("# PIC16F1xxx LV-ICSP Programmer")
-    print(   f'Auto Prog: {"Yes" if auto_prog else "No"}')
+    print('# PIC16F1xxx LV-ICSP Programmer')
+    print(   f'Auto Prog: {'Yes' if auto_prog else 'No'}')
     print(   f'File     : {hex_file}\t{tstamp or ""}')
     prinp()
-    prinp(    "MI/MO    : Enter/Exit LV-ICSP Mode                  (White)")
+    prinp(    'MI/MO    : Enter/Exit LV-ICSP Mode                  (White)')
     if device:
-        prinp("RP/RD/RC : Read   Program/Data/Configuration Memory (Green)")
-        prinp("EP/ED    : Erase  Program/Data               Memory (Yellow)")
-        prinp("WP/WD/WC : Write  Program/Data/Configuration Memory (Red)")
-        prinp("VP/VD/VC : Verify Program/Data/Configuration Memory (Cyan)")
+        prinp('RP/RD/RC : Read   Program/Data/Configuration Memory (Green)')
+        prinp('EP/ED    : Erase  Program/Data               Memory (Yellow)')
+        prinp('WP/WD/WC : Write  Program/Data/Configuration Memory (Red)')
+        prinp('VP/VD/VC : Verify Program/Data/Configuration Memory (Cyan)')
     else:
-        prinp("RC       : Read Configuration Memory                (Green)")
+        prinp('RC       : Read Configuration Memory                (Green)')
 
 class LVP_Mode:
     def __enter__(self):
@@ -478,30 +478,30 @@ class LVP_Mode:
 def proc_auto_prog():
     print('WP', end=', ')
     led.ON_WRITE()
-    icsp.write_program_memory(read_hex_file(hex_file, device["P"]))     # WP
+    icsp.write_program_memory(read_hex_file(hex_file, device['P']))     # WP
 
     print('VP', end=', ')
     led.ON_VERIFY()
-    if(verify_data(device["P"], False, icsp.read_program_memory)):  # VP
+    if(verify_data(device['P'], False, icsp.read_program_memory)):  # VP
        return 'Error: Program memory'
 
-    if device["D"][1] > 0:      # check data memory size
+    if device['D'][1] > 0:      # check data memory size
         print('WD', end=', ')
         led.ON_WRITE()
-        icsp.write_data_memory(read_hex_file(hex_file, device["D"]))        # WD
+        icsp.write_data_memory(read_hex_file(hex_file, device['D']))        # WD
 
         print('VD', end=', ')
         led.ON_VERIFY()
-        if(verify_data(device["D"], False, icsp.read_data_memory)):     # VD
+        if(verify_data(device['D'], False, icsp.read_data_memory)):     # VD
            return 'Error: Data memory'
 
     print('WC', end=', ')
     led.ON_WRITE()
-    icsp.write_configulation(read_hex_file(hex_file, device["C"]))          # WC
+    icsp.write_configulation(read_hex_file(hex_file, device['C']))          # WC
 
     print('VC', end=', ')
     led.ON_VERIFY()
-    if(verify_data(device["C"], True, None)):                           # VC
+    if(verify_data(device['C'], True, None)):                           # VC
        return 'Error: Config memory'
 
     return None    # None: success
@@ -578,7 +578,7 @@ while True:
             with NO_Printer():
                 device = read_configuration()
         time.sleep(0.2)
-    print(device["N"])
+    print(device['N'])
 
     if auto_prog:
         print(f'Programming {hex_file}... ', end='')
@@ -597,40 +597,40 @@ while True:
         halt()                  # wait updating files content or reset
 
     # Manual commands
-    print("> ", end="")
+    print('> ', end='')
     text = input().upper()
-    if text == "MI":
+    if text == 'MI':
         led.ON_MODE()
         icsp.set_lvp_mode()
-    elif text == "MO":
+    elif text == 'MO':
         led.ON_MODE()
         icsp.set_normal_mode()
         device = None
-    elif text == "RC":
+    elif text == 'RC':
         led.ON_READ()
         with LVP_Mode():
             device = read_configuration()
         led.set_error(device is None)
-    elif text == "RP":
+    elif text == 'RP':
         led.ON_READ()
         with LVP_Mode():
-            icsp.read_program_memory(device["P"][1])
-    elif text == "RD":
+            icsp.read_program_memory(device['P'][1])
+    elif text == 'RD':
         led.ON_READ()
         with LVP_Mode():
-            icsp.read_data_memory(device["D"][1])
-    elif text == "EP":
+            icsp.read_data_memory(device['D'][1])
+    elif text == 'EP':
         led.ON_ERASE()
         with LVP_Mode():
             icsp.erase_program_memory()
-    elif text == "ED":
+    elif text == 'ED':
         led.ON_ERASE()
         with LVP_Mode():
             icsp.erase_data_memory()
-    elif text == "WP":
+    elif text == 'WP':
         led.ON_WRITE()
         with LVP_Mode():
-            icsp.write_program_memory(read_hex_file(hex_file, device["P"]))
+            icsp.write_program_memory(read_hex_file(hex_file, device['P']))
         # TODO do not overwrite configuration word
         # なぜかWPでconfiguration wordを書くとおかしくなる(WPのあとでWCで書くと問題ない)
         #  File Data
@@ -638,44 +638,44 @@ while True:
         #  Read Data
         #    0000: 3FFF 3FFF <--!!
         # 最悪 :02 0000 04 0001 F9 から次の:02 0000 04 0001以外 まで無視するとか)
-    elif text == "WD":
+    elif text == 'WD':
         led.ON_WRITE()
         with LVP_Mode():
-            icsp.write_data_memory(read_hex_file(hex_file, device["D"]))
-    elif text == "WC":
+            icsp.write_data_memory(read_hex_file(hex_file, device['D']))
+    elif text == 'WC':
         led.ON_WRITE()
         with LVP_Mode():
-            icsp.write_configulation(read_hex_file(hex_file, device["C"]))
-    elif text == "VP":
+            icsp.write_configulation(read_hex_file(hex_file, device['C']))
+    elif text == 'VP':
         led.ON_VERIFY()
         with LVP_Mode():
-            verify_data(device["P"], False, icsp.read_program_memory)
-    elif text == "VD":
+            verify_data(device['P'], False, icsp.read_program_memory)
+    elif text == 'VD':
         led.ON_VERIFY()
         with LVP_Mode():
-            verify_data(device["D"], False, icsp.read_data_memory)
-    elif text == "VC":
+            verify_data(device['D'], False, icsp.read_data_memory)
+    elif text == 'VC':
         led.ON_VERIFY()
         with LVP_Mode():
-            verify_data(device["C"], True, None)
-    elif text == "TF":
-        data = read_hex_file(hex_file, device["P"])
+            verify_data(device['C'], True, None)
+    elif text == 'TF':
+        data = read_hex_file(hex_file, device['P'])
         if not data: continue
-        prinp("Program Memory");        print_data(data)
+        prinp('Program Memory');        print_data(data)
 
-        data = read_hex_file(hex_file, device["C"])
+        data = read_hex_file(hex_file, device['C'])
         if not data: continue
-        prinp("Configuration Memory");  print_data(data)
+        prinp('Configuration Memory');  print_data(data)
 
-        data = read_hex_file(hex_file, device["D"])
+        data = read_hex_file(hex_file, device['D'])
         if not data: continue
-        prinp("Data Memory");           print_data(data)
+        prinp('Data Memory');           print_data(data)
 
-    elif text in ["?", "h", "help"]:
+    elif text in ['?', 'H', 'HELP']:
         print_help()
-    elif text == "":
+    elif text == '':
         pass
     else:
-        prinp("Invalid Command")
+        prinp('Invalid Command')
     time.sleep(0.1)
 
