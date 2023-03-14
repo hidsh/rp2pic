@@ -439,21 +439,26 @@ class LED_NEOPIXEL:
         neopixel_write.neopixel_write(self.DAT, bytearray([0x20, 0x00, 0x20]))
 
 
+class NO_Printer:
+    def __enter__(self):
+        global prinp
+        self.func_orig = prinp
+        prinp = self.nop
+    def __exit__(self, exc_type, exc_value, tracebak):
+        global prinp
+        prinp = self.func_orig
+    def nop(*objs, sep='', end='\n'):
+        pass
 
-can_print = True
 def prinp(*objs, sep='', end='\n'):
-    if can_print is False:
-       return
     print(*objs, sep=sep, end=end)
 
-def show_help():
-    if can_print is False: return
-
+def print_help():
     print()
     print("# PIC16F1xxx LV-ICSP Programmer")
     print(   f'Auto Prog: {"Yes" if auto_prog else "No"}')
     print(   f'File     : {hex_file}\t{tstamp or ""}')
-    print()
+    prinp()
     prinp(    "MI/MO    : Enter/Exit LV-ICSP Mode                  (White)")
     if device:
         prinp("RP/RD/RC : Read   Program/Data/Configuration Memory (Green)")
@@ -469,20 +474,6 @@ class LVP_Mode:
 
     def __exit__(self, exc_type, exc_value, traceback):
         icsp.set_normal_mode()
-
-class NO_Printer:
-    def __init__(self):
-        try:
-            self.verbose_bak = verbose
-        except NameError:
-            self.verbose_bak = False
-
-    def __enter__(self):
-        verbose = False
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        global verbose
-        verbose = self.verbose_bak
 
 def proc_auto_prog():
     print('WP', end=', ')
@@ -527,10 +518,14 @@ def get_latest_hex():
     if hexs:
         tstamps = [stat(x)[8] for x in hexs]
         max_idx = tstamps.index(max(tstamps))
-        print(tstamps[max_idx])
+        prinp(tstamps[max_idx])
         return (hexs[max_idx], fmt_time(tstamps[max_idx]))
     else:
         return (None, None)
+
+def halt():
+    while True:
+        time.sleep(1)
 
 # -----------------------------------------------------------------------------
 # Main Routine
@@ -562,27 +557,31 @@ SW.direction = digitalio.Direction.INPUT
 SW.pull = digitalio.Pull.UP
 
 auto_prog = not SW.value    # Press (LOW) --> Auto prog:ON
-can_print = not auto_prog   # no print when Auto prog
 
 led.set_error(0)
 led.OFF()
 led_error.OFF()
 
 hex_file = ''
+
 while True:
     while not hex_file:
-        hex_file, tstamp = get_latest_hex()
+        with NO_Printer():
+            hex_file, tstamp = get_latest_hex()
         time.sleep(0.2)
 
     device = None
+    print('Finding uC... ', end='')
     while not device:
         led.set_error(1)
         with LVP_Mode():
-            device = read_configuration()
+            with NO_Printer():
+                device = read_configuration()
         time.sleep(0.2)
+    print(device["N"])
 
     if auto_prog:
-        print(f'Programming {hex_file}...', end='')
+        print(f'Programming {hex_file}... ', end='')
         with LVP_Mode():
             result = proc_auto_prog()
 
@@ -595,12 +594,10 @@ while True:
             led.set_error(0)
             led.OFF()
 
-        while True:
-            time.sleep(1)        # wait updating files content or reset
+        halt()                  # wait updating files content or reset
 
-    # Manual programming
-    show_help()
-    prinp("> ", end="")
+    # Manual commands
+    print("> ", end="")
     text = input().upper()
     if text == "MI":
         led.ON_MODE()
@@ -673,6 +670,9 @@ while True:
         data = read_hex_file(hex_file, device["D"])
         if not data: continue
         prinp("Data Memory");           print_data(data)
+
+    elif text in ["?", "h", "help"]:
+        print_help()
     elif text == "":
         pass
     else:
