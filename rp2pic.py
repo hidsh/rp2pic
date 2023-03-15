@@ -20,7 +20,7 @@ import board
 import digitalio
 from os import stat, listdir
 from adafruit_datetime import datetime
-
+from busio import I2C
 
 if board.board_id == 'Seeeduino XIAO RP2040':
     import neopixel_write
@@ -72,6 +72,12 @@ class ICSP:
         self.ICSPCLK.direction = digitalio.Direction.OUTPUT
         self.ICSPDAT = digitalio.DigitalInOut(ICSPDAT)
         self.ICSPDAT.direction = digitalio.Direction.OUTPUT
+
+    def reset(self):
+        self.MCLR.value = False
+        time.sleep(0.5)
+        self.MCLR.value = True
+        time.sleep(0.5)
 
     # Communication Routine
 
@@ -438,6 +444,33 @@ class LED_NEOPIXEL:
     def ON_VERIFY(self):  # Cyan
         neopixel_write.neopixel_write(self.DAT, bytearray([0x20, 0x00, 0x20]))
 
+class I2C_Util:
+    def __init__(self, scl, sda):
+        self.i2c = I2C(scl, sda)
+
+    def scan(self):
+        while not self.i2c.try_lock():
+            pass
+
+        slave_ids = [hex(x) for x in self.i2c.scan()]
+        print(f'slave: {slave_ids}')        # e.g. mcp23017 = 0x20 (010_0xxx)
+        self.i2c.deinit()
+    def send(self, s_addr, *s_data):
+        addr = int(s_addr, 16)
+        data = [int(x, 16) for x in s_data]
+        if addr > 0xff:
+            print(f'Error! Slave address "{s_addr}" > 0xFF')
+            return
+
+
+        invalid_idx = list((i for i, x in enumerate(arr) if x > 0xff))
+        if invalid_idx:
+            for i in invalid_idx:
+                print(f'Error! Data "{s_addr[i]}" > 0xFF')
+            return
+
+        i2c.writeto(addr, data)
+
 
 class NO_Printer:
     def __enter__(self):
@@ -516,7 +549,7 @@ def list_hex_file():
 def get_latest_hex():
     hexs = list(list_hex_file())
     if hexs:
-        tstamps = [stat(x)[8] for x in hexs]
+        tstamps = [stat(x)[8] for x in hexs]    # mtime
         max_idx = tstamps.index(max(tstamps))
         prinp(tstamps[max_idx])
         return (hexs[max_idx], fmt_time(tstamps[max_idx]))
@@ -534,9 +567,13 @@ if board.board_id == 'Seeeduino XIAO RP2040':
     PIN_ICSP_MCLR = board.D6
     PIN_ICSP_CLK = board.D8
     PIN_ICSP_DAT = board.D7
-    PIN_SW_AUTO = board.D5
-    led_error = LED_MONO(board.D4)
+    PIN_SW_AUTO = board.D3
+    led_error = LED_MONO(board.D2)
     led = LED_NEOPIXEL()
+
+    PIN_I2C_SCL = board.D5
+    PIN_I2C_SDA = board.D4
+
 elif board.board_id == 'raspberry_pi_pico':
     PIN_ICSP_MCLR = board.GP18
     PIN_ICSP_CLK = board.GP17
@@ -544,6 +581,10 @@ elif board.board_id == 'raspberry_pi_pico':
     PIN_SW_AUTO = board.GP19
     led_error = LED_MONO(board.GP15)
     led = LED_MONO(board.LED)
+
+    PIN_I2C_SCL = board.GP13
+    PIN_I2C_SDA = board.GP12
+
 else:
     prinp(f'Unsuppored Board ID:{board.board_id}')
     while True:
@@ -562,23 +603,22 @@ led.set_error(0)
 led.OFF()
 led_error.OFF()
 
-hex_file = ''
 
 while True:
+    hex_file = ''
     while not hex_file:
         with NO_Printer():
             hex_file, tstamp = get_latest_hex()
         time.sleep(0.2)
 
     device = None
-    print('Finding uC... ', end='')
     while not device:
         led.set_error(1)
         with LVP_Mode():
             with NO_Printer():
                 device = read_configuration()
         time.sleep(0.2)
-    print(device['N'])
+    print(f'{hex_file} --> {device["N"]}')
 
     if auto_prog:
         print(f'Programming {hex_file}... ', end='')
@@ -599,7 +639,14 @@ while True:
     # Manual commands
     print('> ', end='')
     text = input().upper()
-    if text == 'MI':
+    if text in ['?', 'H', 'HELP']:
+        print_help()
+    elif text == 'RESET':
+        led.ON_MODE()
+        icsp.reset()
+        led.set_error(0)
+        led.OFF()
+    elif text == 'MI':
         led.ON_MODE()
         icsp.set_lvp_mode()
     elif text == 'MO':
@@ -671,8 +718,26 @@ while True:
         if not data: continue
         prinp('Data Memory');           print_data(data)
 
-    elif text in ['?', 'H', 'HELP']:
-        print_help()
+    elif text in ["I2C", "I2"]:
+        cmd = ''
+        while True:
+            i2c = I2C_Util(PIN_I2C_SCL, PIN_I2C_SDA)
+            i2c.scan()
+            print('I2C> ', end='')
+            cmd = input().upper()
+            if cmd in ['QUIT', '!!!']:
+                break
+            elif cmd in ['WITRE-AND-READ', 'WR', 'W-R', 'SEND-AND-RECV', 'SR', 'S-R']:
+                i2c.write_then_read()
+            elif cmd in ['WRITE', 'W', 'SEND', 'S']:
+                i2c.write()
+            elif cmd in ['READ', 'RECV', 'R']:
+                i2c.read()
+            elif cmd == '':
+                pass
+            else:
+                prinp('Invalid Command')
+
     elif text == '':
         pass
     else:
