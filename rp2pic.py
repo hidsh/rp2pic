@@ -864,7 +864,7 @@ while True:                 # command loop (top)
                 print(f'Choose target (Slave address): {" ".join(slaves)}')
                 print('e.g. "addr 2b" to choose 0x2B as a target device address')
 
-            print('I2C> ', end='')
+            print(f'I2C {hex(util.tgt_addr)}> ', end='')
             line = input().upper().split()
             cmd = line[0]
             args = line[1:]
