@@ -1,6 +1,8 @@
 # -----------------------------------------------------------------------------
 # PIC16F1xxx LV-ICSP Programmer by RP2040 bros. and CircuitPython
 #
+# This project is based on this [blog article](https://ameblo.jp/lonetrip/entry-12763727309.html). Thanks!
+#
 # Seeeduino XIAO RP2040      Microchip PIC12F1822
 #   3V3          -----------   1 VDD
 #   GND          -----------   8 VSS
@@ -726,11 +728,13 @@ RETRY_MAX = 5
 
 print()
 print('# PIC16F1xxx LV-ICSP Programmer')
+print('waiting hex...')
 while True:                 # command loop (top)
     hex_file = ''
     while not hex_file:
         with NO_Printer():
             hex_file, tstamp = get_latest_hex()
+            # print(f'fn={hex_file}, {tstamp}')
         time.sleep(0.2)
 
     device = None
@@ -750,6 +754,7 @@ while True:                 # command loop (top)
 
     auto_prog = not SW.value    # Press (LOW) --> Auto prog:ON
     if auto_prog:
+        print('Auto Prog detected.')
         print(f'Programming {hex_file}... ', end='')
         with LVP_Mode():
             result = proc_auto_prog()
@@ -881,4 +886,3 @@ while True:                 # command loop (top)
     else:
         prinp('Invalid Command')
     time.sleep(0.1)
-
