@@ -41,10 +41,10 @@ DEVICE_LIST = {
     0x2CE0: {  # Device ID
         'P': [0x0000, 0x0800, 0x3FFF],  # Address, Size, Value
         'C': [0x8007, 0x0002, 0x3FFF],  # Address, Size, Value
-        'D': [0x2000, 0x0000, 0x00FF],  # Address, Size, Value
+        'D': [0xF000, 0x0000, 0x00FF],  # Address, Size, Value # TODO temporary disabled, High-Endurance Flash should be supported
         'N': 'PIC16F1503',  # Device Name
     },
-    0x2400: {  # Device ID
+    0x2300: {  # Device ID
         'P': [0x0000, 0x0800, 0x3FFF],  # Address, Size, Value
         'C': [0x8007, 0x0002, 0x3FFF],  # Address, Size, Value
         'D': [0xF000, 0x0000, 0x00FF],  # Address, Size, Value
@@ -280,15 +280,15 @@ def print_data(data):
 
 
 def verify_data(memory, config, read_data):
-    prinp('File Data')
-    data_file = read_hex_file(hex_file, memory)
-    print_data(data_file)
-    prinp('Read Data')
+    prinp('Hex File')
+    data_hex = read_hex_file(hex_file, memory)
+    print_data(data_hex)
+    prinp('Device')
     if config:
-        data_read = icsp.read_configuration(11, 'config')[7:9]
+        data_device = icsp.read_configuration(11, 'config')[7:9]
     else:
-        data_read = read_data(memory[1])
-    if data_file == data_read:
+        data_device = read_data(memory[1])
+    if data_hex == data_device:
         prinp('Verify OK')
         return None
     else:
@@ -446,7 +446,6 @@ class LED_NEOPIXEL:
 
 class I2C_Util:
     tgt_addr = None
-    BUF_SIZE = 1
 
     def __init__(self, scl, sda):
         self.i2c = I2C(scl, sda)
@@ -474,7 +473,7 @@ class I2C_Util:
         self.i2c.deinit()
         del self.i2c
 
-    def scan(self):
+    def scan(self, args=[]):
         slaves = []
         while not self.i2c.try_lock():
             pass
@@ -510,11 +509,11 @@ class I2C_Util:
 
     def read(self, s_args):
         if not s_args:
-            n = self.BUF_SIZE
+            sz = 1
         else:
-            n = max(int(s_args[0]), 1)
+            sz = max(int(s_args[0]), 1)
 
-        rx_buf = bytearray(n)
+        rx_buf = bytearray(sz)
         err=''
 
         while not self.i2c.try_lock():
@@ -535,11 +534,11 @@ class I2C_Util:
 
     def write_then_read(self, s_args):
         if not s_args:
-            n = self.BUF_SIZE
+            sz = 1
         else:
-            n = max(int(s_args[-1]), 1)
+            sz = max(int(s_args[-1]), 1)
 
-        rx_buf = bytearray(n)
+        rx_buf = bytearray(sz)
         tx_data = [int(x, 16) for x in s_args[:-1]]
         err=''
 
@@ -607,23 +606,21 @@ def prinp(*objs, sep='', end='\n'):
     print(*objs, sep=sep, end=end)
 
 def print_help():
-    print()
-    print(    '# PIC16F1xxx LV-ICSP Programmer')
-    print(   f'Auto Prog: {'Yes' if auto_prog else 'No'}')
-    print(   f'Device   : {device["N"]}')
-    print(   f'File     : {hex_file}\t{tstamp or ""}')
+    print(   f'Auto Prog : {'Yes' if auto_prog else 'No'}')
+    print(   f'Device    : {device["N"]}')
+    print(   f'File      : {hex_file}\t{tstamp or ""}')
     prinp()
-    prinp(    'MI/MO    : Enter/Exit LV-ICSP Mode                  (White)')
+    prinp(    'MI/MO     : Enter/Exit LV-ICSP Mode                  (White)')
     if device:
-        prinp('RP/RD/RC : Read   Program/Data/Configuration Memory (Green)')
-        prinp('EP/ED    : Erase  Program/Data               Memory (Yellow)')
-        prinp('WP/WD/WC : Write  Program/Data/Configuration Memory (Red)')
-        prinp('VP/VD/VC : Verify Program/Data/Configuration Memory (Cyan)')
+        prinp('RP/RD/RC  : Read   Program/Data/Configuration Memory (Green)')
+        prinp('EP/ED     : Erase  Program/Data               Memory (Yellow)')
+        prinp('WP/WD/WC  : Write  Program/Data/Configuration Memory (Red)')
+        prinp('VP/VD/VC  : Verify Program/Data/Configuration Memory (Cyan)')
     else:
-        prinp('RC       : Read Configuration Memory                (Green)')
+        prinp('RC        : Read Configuration Memory                (Green)')
         prinp('# Utilities')
-        prinp('I2C      : I2C Utility')
-        prinp('I2       : <alias>')
+        prinp('I2C       : I2C Utility')
+        prinp('I2        : <alias>')
 
 class LVP_Mode:
     def __enter__(self):
@@ -702,7 +699,7 @@ elif board.board_id == 'raspberry_pi_pico':
     PIN_ICSP_MCLR = board.GP18
     PIN_ICSP_CLK = board.GP17
     PIN_ICSP_DAT = board.GP16
-    PIN_SW_AUTO = board.GP19
+    PIN_SW_AUTO = board.GP14
     led_error = LED_MONO(board.GP15)
     led = LED_MONO(board.LED)
 
@@ -721,13 +718,14 @@ SW = digitalio.DigitalInOut(PIN_SW_AUTO)
 SW.direction = digitalio.Direction.INPUT
 SW.pull = digitalio.Pull.UP
 
-auto_prog = not SW.value    # Press (LOW) --> Auto prog:ON
-
 led.set_error(0)
 led.OFF()
 led_error.OFF()
 
+RETRY_MAX = 5
 
+print()
+print('# PIC16F1xxx LV-ICSP Programmer')
 while True:                 # command loop (top)
     hex_file = ''
     while not hex_file:
@@ -736,13 +734,21 @@ while True:                 # command loop (top)
         time.sleep(0.2)
 
     device = None
-    while not device:
+    retry_count = 0
+    while not device and retry_count < RETRY_MAX:
         led.set_error(1)
         with LVP_Mode():
             with NO_Printer():
                 device = read_configuration()
         time.sleep(0.2)
+        retry_count += 1
 
+    if not device:
+        with LVP_Mode():
+            device = read_configuration()
+        raise RuntimeError('Error while read_configuration. Unsupported Device ID?')
+
+    auto_prog = not SW.value    # Press (LOW) --> Auto prog:ON
     if auto_prog:
         print(f'Programming {hex_file}... ', end='')
         with LVP_Mode():
