@@ -52,8 +52,9 @@ It has to be download and installed under the directory `/lib` on the device.
 1. rename it to `code.py`
 
 ## Usage
+Copy the .hex file directly under `/CIRCUITPY/` then RP2PIC will recognize it. RP2PIC checks the timestamp of the all .hex file.
 
-rp2pic has two modes.
+RP2PIC has two modes.
 
 |Mode|PIN_SW_AUTO|
 |:---|:--:|
