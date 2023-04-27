@@ -1,7 +1,7 @@
 # -----------------------------------------------------------------------------
-# PIC16F1xxx LV-ICSP Programmer by RP2040 bros. and CircuitPython
+# PIC16F1xxx LV-ICSP Programmer by RP2040 cousins. and CircuitPython
 #
-# This project is based on this [blog article](https://ameblo.jp/lonetrip/entry-12763727309.html). Thanks!
+# This project is based on a blog article (https://ameblo.jp/lonetrip/entry-12763727309.html). Thanks!
 #
 # Seeeduino XIAO RP2040      Microchip PIC12F1822
 #   3V3          -----------   1 VDD
