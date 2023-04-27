@@ -2,11 +2,11 @@
 
 A PIC Programmer by Raspberry Pi Pico and the cousins
 
-![breadboard](img/breadboard.jpg)
+![breadboard example](img/breadboard.jpg)
 
 RP2PIC runs on [circuitpython](https://circuitpython.org/).
 
-This project is based on [XIAO RP2040で PIC12F1822ライタの製作](https://ameblo.jp/lonetrip/entry-12763727309.html). Thanks!
+This project is based on a [blog article](https://ameblo.jp/lonetrip/entry-12763727309.html). Thanks!
 
 ## Features
 
@@ -17,10 +17,12 @@ This project is based on [XIAO RP2040で PIC12F1822ライタの製作](https://a
 ## Hardware
 ![schematic](img/rp2pic_schematic.png)
 
+For now I've just built it on a breadboard, but I'm going to make it again on a dedicated PCB when I have time. 
 
 ## Supported Devices
 
 |Device|Support|Note|
+|:---|:---:|:---|
 |16f1503|yes|not checked data memory|
 |16f1933|not yet||
 
@@ -41,7 +43,7 @@ This project is based on [XIAO RP2040で PIC12F1822ライタの製作](https://a
 RP2PIC requires a library function `adafruit_datetime.mpy`.
 It has to be download and installed under the directory `/lib` on the device. 
 
-1. download library bundle from [https://circuitpython.org/libraries](https://circuitpython.org/libraries).
+1. download `adafruit-circuitpython-bundle-NN.x-mpy-YYYYMMDD.zip` from [https://circuitpython.org/libraries](https://circuitpython.org/libraries).
 
 1. copy `adafruit_datetime.mpy` in the zip into the folder `/CIRCUITPY/lib`
 
@@ -53,13 +55,18 @@ It has to be download and installed under the directory `/lib` on the device.
 
 rp2pic has two modes.
 
-|Mode|`PIN_SW_AUTO`|
+|Mode|PIN_SW_AUTO|
+|:---|:--:|
 |Command Mode| High|
 |Auto-Prog Mode| Low|
 
 ### Command Mode
 
 Command Mode can be Program/Erase/Verify by CUI through USB serial terminal such like gnu screen, minicom, teraterm, etc.
+
+To show command help, type `h` at the top-level prompt `>`.
+
+Head 3 lines on help shows current status such as Auto-Prog, Target device name, .hex filename currently selected. The following lines show each programmer commands.
 
 ```
 # PIC16F1xxx LV-ICSP Programmer
@@ -78,11 +85,15 @@ VP/VD/VC  : Verify Program/Data/Configuration Memory (Cyan)
 
 ### Auto-Prog Mode
 
-Auto-Prog Mode behaves as an automatic programmer.
-
-You can program it into PIC just by Drag and Drop a hex file.
+Auto-Prog Mode behaves as an automatic programmer. You can program it into PIC just by Drag and Drop a hex file.
 
 ### I2C Debug Utility
+
+If you only test a simple circuit using I2C, you can input I2C commands to the device from the host PC and check the response while the RP2PIC is connected.
+
+To use the I2C debug utility, type `i2c` at the top level prompt `>`. A new prompt (e.g. `I2C 0x2f>`) shows the slave address of the device debugging now.
+
+To show command help, type `h` at the i2c prompt `i2c 0xXX>`.
 
 ```
 # PIC16F1xxx LV-ICSP Programmer
@@ -116,6 +127,8 @@ e.g. wr 2 C2 5 10  : Write data "0x02 0xC2 0x05" to target device,
 ## TODO
 - [ ] cleanup command loop
 - [ ] dedicated pcb
+- [ ] spi debug utility
+- [ ] uart debug utility
 
 ## Links
 
