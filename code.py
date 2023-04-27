@@ -727,7 +727,7 @@ led_error.OFF()
 RETRY_MAX = 5
 
 print()
-print('# PIC16F1xxx LV-ICSP Programmer')
+print('# RP2PIC - PIC16F1xxx LV-ICSP Programmer')
 print('waiting hex...')
 while True:                 # command loop (top)
     hex_file = ''
