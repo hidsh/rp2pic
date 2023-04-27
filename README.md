@@ -17,7 +17,7 @@ This project is based on a [blog article](https://ameblo.jp/lonetrip/entry-12763
 ## Hardware
 ![schematic](img/rp2pic_schematic.png)
 
-For now I've just built it on a breadboard, but I'm going to make it again on a dedicated PCB when I have time. 
+For now I've just built it on a breadboard, but I'm going to make dedicated PCBs when I have time.
 
 ## Supported Devices
 
