@@ -96,7 +96,7 @@ To use the I2C debug utility, type `i2c` at the top level prompt `>`. A new prom
 To show command help, type `h` at the i2c prompt `I2C 0xXX>`.
 
 ```
-# PIC16F1xxx LV-ICSP Programmer
+# RP2PIC - PIC16F1xxx LV-ICSP Programmer
 waiting hex...
 > i2c
 I2C 0x2f> h
