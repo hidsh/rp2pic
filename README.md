@@ -48,8 +48,7 @@ It has to be download and installed under the directory `/lib` on the device.
 1. copy `adafruit_datetime.mpy` in the zip into the folder `/CIRCUITPY/lib`
 
 ### 3. Install RP2PIC
-1. copy `rp2pic.py` into `CIRCUITPY`
-1. rename it to `code.py`
+copy `code.py` into the folder `CIRCUITPY`
 
 ## Usage
 Copy the .hex file directly under `/CIRCUITPY/` then RP2PIC will recognize it. RP2PIC checks the timestamp of the all .hex file.
@@ -70,7 +69,7 @@ To show command help, type `h` at the top-level prompt `>`.
 Head 3 lines on help shows current status such as Auto-Prog, Target device name, .hex filename currently selected. The following lines show each programmer commands.
 
 ```
-# PIC16F1xxx LV-ICSP Programmer
+# RP2PIC - PIC16F1xxx LV-ICSP Programmer
 waiting hex...
 > h
 Auto Prog : No
