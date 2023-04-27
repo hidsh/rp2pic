@@ -93,7 +93,7 @@ If you only test a simple circuit using I2C, you can input I2C commands to the d
 
 To use the I2C debug utility, type `i2c` at the top level prompt `>`. A new prompt (e.g. `I2C 0x2f>`) shows the slave address of the device debugging now.
 
-To show command help, type `h` at the i2c prompt `i2c 0xXX>`.
+To show command help, type `h` at the i2c prompt `I2C 0xXX>`.
 
 ```
 # PIC16F1xxx LV-ICSP Programmer
