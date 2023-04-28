@@ -4,6 +4,8 @@ A PIC Programmer by Raspberry Pi Pico and the cousins
 
 ![breadboard example](img/breadboard.jpg)
 
+**WIP**
+
 RP2PIC runs on [circuitpython](https://circuitpython.org/).
 
 This project is based on a [blog article](https://ameblo.jp/lonetrip/entry-12763727309.html). Thanks!
