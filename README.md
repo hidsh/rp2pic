@@ -93,7 +93,7 @@ Auto-Prog Mode behaves as an automatic programmer. You can program it into PIC j
 
 This utility is for debugging PIC devices that implement I2C slave functionality.
 
-RP2PIC acts as an I2C host device to send and receive I2C commands to and from PIC devices. If you only test a simple circuit using I2C, you can input I2C commands to the device from the host PC and check the response while the RP2PIC is connected. To use the I2C debug utility, type `i2c` at the top level prompt `>`. A new prompt (e.g. `I2C 0x2f>`) shows the slave address of the device debugging now.
+RP2PIC acts as an I2C master device to send and receive I2C commands to and from PIC devices. If you only test a simple circuit using I2C, you can input I2C commands to the device from the host PC and check the response while the RP2PIC is connected. To use the I2C debug utility, type `i2c` at the top level prompt `>`. A new prompt (e.g. `I2C 0x2f>`) shows the slave address of the device debugging now.
 
 To show command help, type `h` at the i2c prompt `I2C 0xXX>`.
 
@@ -127,6 +127,7 @@ e.g. wr 2 C2 5 10  : Write data "0x02 0xC2 0x05" to target device,
 ```
 
 ## TODO
+- [ ] rewrite the output for icsp pulse to properly 
 - [ ] cleanup command loop
 - [ ] dedicated pcb
 - [ ] spi debug utility
