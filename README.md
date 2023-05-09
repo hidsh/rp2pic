@@ -154,7 +154,7 @@ After that, you can type a test command like `test i2c_1` and the I2C tool will 
 I2C 0x2f> test i2c_1
 ------------------------------------------------------------
 1: wr ff 3      => 01 01 08      PASS
-2: wr ff 3      => 01 01 08      FAIL    Should be "01 01 02"
+2: wr ff 3      => 01 01 08      FAIL    Should be "01 01 01"
 ------------------------------------------------------------
 FAILED: 1/2, Lines: 4
 ```
