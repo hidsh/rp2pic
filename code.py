@@ -20,9 +20,10 @@
 import time
 import board
 import digitalio
+from busio import I2C
 from os import stat, listdir
 from adafruit_datetime import datetime
-from busio import I2C
+import icsp
 
 if board.board_id == 'Seeeduino XIAO RP2040':
     import neopixel_write
@@ -53,216 +54,6 @@ DEVICE_LIST = {
         'N': 'PIC16F1933',  # Device Name
     },
 }
-
-
-# -----------------------------------------------------------------------------
-# Low-Voltage In-Circuit Serial Programming (LV-ICSP) Class
-
-
-class ICSP:
-    WAIT_TCLK = 200e-9  # 200 ns
-    WAIT_TDLY = 1e-6  # 1 us
-    WAIT_TENT = 1e-3  # 1 ms
-    WAIT_TERA = 5e-3  # 5 ms
-
-    COLUMN = 0x10
-
-    def __init__(self, MCLR, ICSPCLK, ICSPDAT):
-        self.MCLR = digitalio.DigitalInOut(MCLR)
-        self.MCLR.direction = digitalio.Direction.OUTPUT
-        self.ICSPCLK = digitalio.DigitalInOut(ICSPCLK)
-        self.ICSPCLK.direction = digitalio.Direction.OUTPUT
-        self.ICSPDAT = digitalio.DigitalInOut(ICSPDAT)
-        self.ICSPDAT.direction = digitalio.Direction.OUTPUT
-
-    def reset(self):
-        self.MCLR.value = False
-        time.sleep(0.5)
-        self.MCLR.value = True
-        time.sleep(0.5)
-
-    # Communication Routine
-
-    def send_bit(self, length, value):
-        for i in range(length):
-            # TCKH: Min 100 ns
-            self.ICSPCLK.value = True
-            self.ICSPDAT.value = value & 1
-            # TDS: Min 100 ns
-            time.sleep(self.WAIT_TCLK)
-            # TCKL: Min 100 ns
-            self.ICSPCLK.value = False
-            # TDH: Min 100 ns
-            time.sleep(self.WAIT_TCLK)
-            value = value >> 1
-
-    def send_command(self, value):
-        self.send_bit(6, value)
-        # TDLY: Min 1 us
-        time.sleep(self.WAIT_TDLY)
-
-    def send_data(self, value):
-        self.send_bit(1, 0)
-        self.send_bit(14, value)
-        self.send_bit(1, 0)
-
-    def recv_data(self):
-        value = 0
-        self.send_bit(1, 0)
-        self.ICSPDAT.direction = digitalio.Direction.INPUT
-        for i in range(14):
-            # TCKH: Min 100 ns
-            self.ICSPCLK.value = True
-            # TCO: Max 80 ns
-            time.sleep(self.WAIT_TCLK)
-            value |= self.ICSPDAT.value << i
-            # TCKL: Min 100 ns
-            self.ICSPCLK.value = False
-            time.sleep(self.WAIT_TCLK)
-        self.ICSPDAT.direction = digitalio.Direction.OUTPUT
-        self.send_bit(1, 0)
-        return value
-
-    def set_lvp_mode(self):
-        # TENTS: Min 100 ns
-        self.MCLR.value = True
-        time.sleep(self.WAIT_TENT)
-        # TENTH: Min 250 us
-        self.MCLR.value = False
-        time.sleep(self.WAIT_TENT)
-        # Key Sequence: 0x4D434850 (MCHP in ASCII)
-        self.send_bit(8, 0x50)
-        self.send_bit(8, 0x48)
-        self.send_bit(8, 0x43)
-        self.send_bit(8, 0x4D)
-        # Total 33 Clocks
-        self.send_bit(1, 0)
-        time.sleep(self.WAIT_TENT)
-
-    def set_normal_mode(self):
-        self.MCLR.value = True
-
-    # Command Routine
-
-    def run_load_configuration(self):
-        self.send_command(0x00)
-        self.send_data(0x00)
-
-    def run_load_data_for_program_memory(self, value):
-        self.send_command(0x02)
-        self.send_data(value)
-
-    def run_load_data_for_data_memory(self, value):
-        self.send_command(0x03)
-        self.send_data(value)
-
-    def run_read_data_from_program_memory(self):
-        self.send_command(0x04)
-        return self.recv_data()
-
-    def run_read_data_from_data_memory(self):
-        self.send_command(0x05)
-        return self.recv_data()
-
-    def run_increment_address(self):
-        self.send_command(0x06)
-
-    def run_reset_address(self):
-        self.send_command(0x16)
-
-    def run_begin_internally_timed_programming(self):
-        self.send_command(0x08)
-        # TPINT: Max 5 ms
-        time.sleep(self.WAIT_TERA)
-
-    def run_bulk_erase_program_memory(self):
-        self.send_command(0x09)
-        # TERAB: Max 5 ms
-        time.sleep(self.WAIT_TERA)
-
-    def run_bulk_erase_data_memory(self):
-        self.send_command(0x0B)
-        # TERAB: Max 5 ms
-        time.sleep(self.WAIT_TERA)
-
-    # Read Routine
-
-    def read_memory(self, size, run_read_data, show=True):
-        base_address = 0
-        data = [0] * size
-        for address in range(size):
-            data[address] = run_read_data()
-            next_address = address + 1
-            self.run_increment_address()
-            if show is False:
-                continue
-            if ((next_address % self.COLUMN) == 0) or (next_address == size):
-                column_data = data[base_address:next_address] if show != 'config' else data[7:9]    # TODO so dirty
-                print_data_line(base_address, column_data)
-                base_address = next_address
-        return data
-
-    def read_program_memory(self, size):
-        run_read_data = self.run_read_data_from_program_memory
-        self.run_reset_address()
-        return self.read_memory(size, run_read_data)
-
-    def read_configuration(self, size, show=True):
-        run_read_data = self.run_read_data_from_program_memory
-        self.run_load_configuration()
-        return self.read_memory(size, run_read_data, show)
-
-    def read_data_memory(self, size):
-        run_read_data = self.run_read_data_from_data_memory
-        self.run_reset_address()
-        return self.read_memory(size, run_read_data)
-
-    # Erase Routine
-
-    def erase_program_memory(self):
-        self.run_load_configuration()
-        self.run_bulk_erase_program_memory()
-
-    def erase_data_memory(self):
-        self.run_bulk_erase_data_memory()
-
-    # Write Routine
-
-    def write_memory(self, data, latch, run_load_data):
-        base_address = 0
-        size = len(data)
-        for address in range(size):
-            run_load_data(data[address])
-            next_address = address + 1
-            if ((next_address % latch) == 0) or (next_address == size):
-                self.run_begin_internally_timed_programming()
-            self.run_increment_address()
-            if ((next_address % self.COLUMN) == 0) or (next_address == size):
-                column_data = data[base_address:next_address]
-                print_data_line(base_address, column_data)
-                base_address = next_address
-
-    def write_program_memory(self, data):
-        if data:
-            run_load_data = self.run_load_data_for_program_memory
-            self.erase_program_memory()
-            self.run_reset_address()
-            self.write_memory(data, 16, run_load_data)
-
-    def write_configulation(self, data):
-        if data:
-            run_load_data = self.run_load_data_for_program_memory
-            self.run_load_configuration()
-            for i in range(7):
-                self.run_increment_address()
-            self.write_memory(data[0:2], 1, run_load_data)
-
-    def write_data_memory(self, data):
-        if data:
-            run_load_data = self.run_load_data_for_data_memory
-            self.erase_data_memory()
-            self.run_reset_address()
-            self.write_memory(data, 1, run_load_data)
 
 
 # -----------------------------------------------------------------------------
@@ -306,7 +97,7 @@ def read_configuration():
         device_name = '(Not Supported)'
     else:
         device_name = '(' + device_infomation['N'] + ')'
-    # Print
+
     prinp('# Configuration')
     prinp('User ID Location   :', hexstr(data[0:4]))
     prinp('Device ID          :', hexstr([device_id]), device_name)
@@ -446,7 +237,7 @@ class LED_NEOPIXEL:
     def ON_VERIFY(self):  # Cyan
         neopixel_write.neopixel_write(self.DAT, bytearray([0x20, 0x00, 0x20]))
 
-class I2C_Util:
+class I2C_Tool:
     tgt_addr = None
 
     def __init__(self, scl, sda):
@@ -457,7 +248,7 @@ class I2C_Util:
         if not found:
             print(f'Invalid Command: {cmd}')
         else:
-            found[0][1](self, args)
+            return found[0][1](self, args)
 
     def help(self, args):
         if not args:
@@ -475,7 +266,7 @@ class I2C_Util:
         self.i2c.deinit()
         del self.i2c
 
-    def scan(self, args=[]):
+    def cmd_scan(self, args=[]):
         slaves = []
         while not self.i2c.try_lock():
             pass
@@ -486,19 +277,19 @@ class I2C_Util:
             self.i2c.unlock()
         return slaves           # e.g. mcp23017 = [0x20] (010_0xxx)
 
-    def addr(self, s_args):
+    def cmd_addr(self, s_args):
         if not s_args:
             print(f'Target Device: {hex(self.tgt_addr)}')
         elif len(s_args) == 1:
-            if int(s_args[0], 16) in [x[2:] for x in self.scan()]:
+            if int(s_args[0], 16) in [x[2:] for x in self.cmd_scan()]:
                 self.tgt_addr = int(s_args[0], 16)
                 print(f'Target Device: {hex(self.tgt_addr)}')
             else:
                 print(f'Error: Invalid Slave Address: {s_args[0]}')
         else:
-           self.help(['addr'])
+           self.cmd_help(['addr'])
 
-    def write(self, s_args):
+    def cmd_write(self, s_args):
         tx_data = [int(x, 16) for x in s_args]
 
         while not self.i2c.try_lock():
@@ -509,7 +300,9 @@ class I2C_Util:
         finally:
             self.i2c.unlock()
 
-    def read(self, s_args):
+        return 'NO-RESPONSE'
+
+    def cmd_read(self, s_args):
         if not s_args:
             sz = 1
         else:
@@ -530,11 +323,14 @@ class I2C_Util:
         except TimeoutError as e:
             print('Error: I2C Timeout, need "reset"')
         else:
-            print(' => ' + ' '.join([f'{x:02X}' for x in rx_buf]) + err)
+            ret = ' '.join([f'{x:02X}' for x in rx_buf]) + err
+            prinp('       => ' + ret)
         finally:
             self.i2c.unlock()
 
-    def write_then_read(self, s_args):
+        return ret
+
+    def cmd_write_then_read(self, s_args):
         if not s_args:
             sz = 1
         else:
@@ -556,41 +352,104 @@ class I2C_Util:
         except TimeoutError as e:
             print('Error: I2C Timeout, need "reset"')
         else:
-            print(' => ' + ' '.join([f'{x:02X}' for x in rx_buf]) + err)
+            ret = ' '.join([f'{x:02X}' for x in rx_buf]) + err
+            prinp('       => ' + ret)
         finally:
             self.i2c.unlock()
 
+        return ret
+
+    def isfile(self, path):
+        _ = list(filter(lambda x: x == path, listdir()))
+        return _
+
+    def cmd_test(self, s_args):
+        if len(s_args) != 1:
+            print('Error: Test file is not specified')
+            return
+
+        test_path = s_args[0]
+
+        if not self.isfile(test_path):
+            print(f'Error: Test file not found: "{test_path}"')
+            return
+
+        with open(test_path) as f:
+            RED   = '\033[91m'
+            GREEN = '\033[92m'
+            G = '\033[30m\033[42m'
+            END   = '\033[0m'
+            lines = list(filter(lambda x: x and x.startswith('#') == False,
+                                [x.strip() for x in f.readlines()]))
+            print('-' * 60, end='')
+            resp = ''
+            i = 0
+            cnt_ok = 0
+            cnt_ng = 0
+            for s in lines:
+                if s.startswith('=>'):
+                    ok = ' '.join(s.split()[1:])
+                    if resp == ok:
+                        print(f'{G} PASS {END}', end='')
+                        cnt_ok += 1
+                    else:
+                        print(f'{RED} FAIL \t Should be "{ok}{END}"', end='')
+                        cnt_ng += 1
+                else:
+                    i += 1
+                    ll = s.upper().split()
+                    resp = self.handler(ll[0], ll[1:])
+                    print(f'\n{i}: {s}\t=> {resp}', end='\t')
+            print('\n' + '-' * 60)
+            if cnt_ok == 0 and cnt_ng == 0:
+                print(f'{RED}NO TEST (Lines: {len(lines)}){END}')
+            elif cnt_ok == cnt_ok + cnt_ng:
+                print(f'{GREEN}ALL TESTS PASSED SUCCESSFULLY (Tests: {cnt_ok}, Lines: {len(lines)}){END}')
+            else:
+                print(f'{RED}FAILED: {cnt_ng}/{cnt_ok + cnt_ng}, Lines: {len(lines)}{END}')
+            print()
+
     CMD_LIST = (
 (['HELP', 'H', '?'], help,
-'''e.g. help          : Print examples for all I2C Utility
+'''e.g. help          : Print examples for all I2C Tool
      help w        : Print examples for "w" commands
      h             : <alias>
      ?             : <alias>'''),
+
 (['EXIT', 'QUIT', '!!!'], None,
-'''e.g. exit          : Exit from I2C Utility
+'''e.g. exit          : Exit from I2C Tool
      quit          : <alias>
      !!!           : <alias>'''),
-(['RESET'], ICSP.reset,
+
+(['RESET'], icsp.ICSP.reset,
 '''e.g. reset         : Reset target device'''),
-(['SCAN'], scan,
+
+(['SCAN'], cmd_scan,
 '''e.g. scan          : Scan I2C bus then list slave addresses'''),
-(['ADDR'], addr,
+
+(['ADDR'], cmd_addr,
 '''e.g. addr 42       : Set 0x42 as target device
      addr          : Show target device currently set'''),
-(['W', 'S'], write,
+
+(['W', 'S'], cmd_write,
 '''e.g. w C4 2 15     : Write data "0xC4 0x02 0x15" to target device
      w             : Write to target device without any data
      s             : <alias>'''),
-(['R'], read,
+
+(['R'], cmd_read,
 '''e.g. r 8           : Read 8 bytes from target device
      r             : Read 1 byte from target device'''),
-(['WR'], write_then_read,
+
+(['WR'], cmd_write_then_read,
 '''e.g. wr 2 C2 5 10  : Write data "0x02 0xC2 0x05" to target device,
                    :  then read 10 bytes from target device
      wr 10         : Write to target device without any data,
                    :  then read 10 bytes from target device
      wr            : Write to target device without any data,
-                   :  then read 1 byte from target device'''))
+                   :  then read 1 byte from target device'''),
+
+(['TEST'], cmd_test,
+'''e.g. test i2c_1    : Start test for i2c command　according to the test file "i2c_1".'''))
 
 class NO_Printer:
     def __enter__(self):
@@ -609,8 +468,8 @@ def prinp(*objs, sep='', end='\n'):
 
 def print_help():
     print(   f'Auto Prog : {'Yes' if auto_prog else 'No'}')
-    print(   f'Device    : {device["N"]}')
-    print(   f'File      : {hex_file}\t{tstamp or ""}')
+    print(   f'Device    : {device['N']}')
+    print(   f'File      : {hex_file}\t{tstamp or ''}')
     prinp()
     prinp(    'MI/MO     : Enter/Exit LV-ICSP Mode                  (White)')
     if device:
@@ -620,9 +479,10 @@ def print_help():
         prinp('VP/VD/VC  : Verify Program/Data/Configuration Memory (Cyan)')
     else:
         prinp('RC        : Read Configuration Memory                (Green)')
-        prinp('# Utilities')
-        prinp('I2C       : I2C Utility')
-        prinp('I2        : <alias>')
+        prinp('# Tools')
+        prinp('I2C       : I2C Tool')
+        prinp('IIC       : <alias>')
+        prinp('II        : <alias>')
 
 class LVP_Mode:
     def __enter__(self):
@@ -674,7 +534,7 @@ def get_latest_hex():
     if hexs:
         tstamps = [stat(x)[8] for x in hexs]    # mtime
         max_idx = tstamps.index(max(tstamps))
-        prinp(tstamps[max_idx])
+        # prinp(tstamps[max_idx])
         return (hexs[max_idx], fmt_time(tstamps[max_idx]))
     else:
         return (None, None)
@@ -713,7 +573,7 @@ else:
     while True:
         pass
 
-icsp = ICSP(PIN_ICSP_MCLR, PIN_ICSP_CLK, PIN_ICSP_DAT)
+icsp = icsp.ICSP(PIN_ICSP_MCLR, PIN_ICSP_CLK, PIN_ICSP_DAT)
 
 # Automatic programming?
 SW = digitalio.DigitalInOut(PIN_SW_AUTO)
@@ -772,7 +632,7 @@ while True:                 # command loop (top)
 
     # Manual commands
     print('> ', end='')
-    text = input().upper()
+    text = input().strip().upper()
     if text in ['?', 'H', 'HELP']:
         print_help()
     elif text == 'RESET':
@@ -852,34 +712,35 @@ while True:                 # command loop (top)
         if not data: continue
         prinp('Data Memory');           print_data(data)
 
-    elif text in ["I2C", "I2"]:
-        util = I2C_Util(PIN_I2C_SCL, PIN_I2C_SDA)
+    elif text in ['I2C', 'IIC', 'II']:
+        tool = I2C_Tool(PIN_I2C_SCL, PIN_I2C_SDA)
         while True:                     # command loop (I2C)
-            slaves = util.scan()
+            slaves = tool.cmd_scan()
             if not slaves:
                 print('No slave device')
             elif len(slaves) == 1:
-                util.tgt_addr = slaves[0]       # auto setting target device address
+                tool.tgt_addr = slaves[0]       # auto setting target device address
             else:
                 print(f'Choose target (Slave address): {" ".join(slaves)}')
                 print('e.g. "addr 2b" to choose 0x2B as a target device address')
 
-            print(f'I2C {hex(util.tgt_addr)}> ', end='')
-            line = input().upper().split()
-            cmd = line[0]
+            print(f'I2C {hex(tool.tgt_addr)}> ', end='')
+            line = input().split()
+            cmd = line[0].upper()
             args = line[1:]
-            invalid_args = [x for x in args if len(x) > 2]
+            invalid_args = [x for x in args if len(x) > 2] if not cmd in ['TEST'] else []
 
             if invalid_args:
                 print(f'Invalid Data: {" ".join(invalid_args)}')
             elif cmd in ['EXIT', 'QUIT', '!!!']:
-                util.deinit()
-                del util
+                tool.deinit()
+                del tool
                 break
             elif cmd == '':
                 continue
 
-            util.handler(cmd, args)
+            with NO_Printer():
+                tool.handler(cmd, args)
 
     elif text == '':
         pass
