@@ -300,7 +300,7 @@ class I2C_Tool:
         finally:
             self.i2c.unlock()
 
-        return 'NO-RESPONSE'
+        return 'NO-RESP'
 
     def cmd_read(self, s_args):
         if not s_args:
@@ -375,39 +375,42 @@ class I2C_Tool:
             return
 
         with open(test_path) as f:
-            RED   = '\033[91m'
-            GREEN = '\033[92m'
-            G = '\033[30m\033[42m'
-            END   = '\033[0m'
-            lines = list(filter(lambda x: x and x.startswith('#') == False,
-                                [x.strip() for x in f.readlines()]))
-            print('-' * 60, end='')
-            resp = ''
-            i = 0
-            cnt_ok = 0
-            cnt_ng = 0
-            for s in lines:
-                if s.startswith('=>'):
-                    ok = ' '.join(s.split()[1:])
-                    if resp == ok:
-                        print(f'{G} PASS {END}', end='')
-                        cnt_ok += 1
-                    else:
-                        print(f'{RED} FAIL \t Should be "{ok}{END}"', end='')
-                        cnt_ng += 1
+            lines =[x.strip() for x in f.readlines()]
+
+        RED   = '\033[91m'
+        GREEN = '\033[92m'
+        G = '\033[30m\033[42m'
+        END   = '\033[0m'
+        print('-' * 60, end='')
+        resp = ''
+        tn = 0
+        cnt_ok = 0
+        cnt_ng = 0
+        for ln, s in enumerate(lines, start=1):
+            if s == '' or s.startswith('#'):   # empty line or comment
+                continue
+            elif s.startswith('=>'):
+                ok = ' '.join(s.split()[1:])
+                if resp == ok:
+                    print(f'{G} PASS {END}\t{ln:8}', end='')
+                    cnt_ok += 1
                 else:
-                    i += 1
-                    ll = s.upper().split()
-                    resp = self.handler(ll[0], ll[1:])
-                    print(f'\n{i}: {s}\t=> {resp}', end='\t')
-            print('\n' + '-' * 60)
-            if cnt_ok == 0 and cnt_ng == 0:
-                print(f'{RED}NO TEST (Lines: {len(lines)}){END}')
-            elif cnt_ok == cnt_ok + cnt_ng:
-                print(f'{GREEN}ALL TESTS PASSED SUCCESSFULLY (Tests: {cnt_ok}, Lines: {len(lines)}){END}')
+                    print(f'{RED} FAIL {END}\t{ln:8} Should be "{ok}"', end='')
+                    cnt_ng += 1
             else:
-                print(f'{RED}FAILED: {cnt_ng}/{cnt_ok + cnt_ng}, Lines: {len(lines)}{END}')
-            print()
+                ll = s.upper().split()
+                resp = self.handler(ll[0], ll[1:])
+                if ll[0] in ['R', 'WR']:
+                    tn += 1
+                    print(f'\n{tn:3}: {s:20} => {resp:12}', end='\t')
+        print('\n' + '-' * 60)
+        if cnt_ok == 0 and cnt_ng == 0:
+            print(f'{RED}NO TEST (Lines: {len(lines)}){END}')
+        elif cnt_ok == cnt_ok + cnt_ng:
+            print(f'{GREEN}ALL TESTS PASSED SUCCESSFULLY (Tests: {cnt_ok}, Lines: {len(lines)}){END}')
+        else:
+            print(f'{RED}FAILED: {cnt_ng}/{cnt_ok + cnt_ng}, Lines: {len(lines)}{END}')
+        print()
 
     CMD_LIST = (
 (['HELP', 'H', '?'], help,
