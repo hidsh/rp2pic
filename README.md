@@ -124,22 +124,26 @@ e.g. wr 2 C2 5 10  : Write data "0x02 0xC2 0x05" to target device,
                    :  then read 10 bytes from target device
      wr            : Write to target device without any data,
                    :  then read 1 byte from target device
-e.g. test i2c_1    : Start test for i2c command　according to the test file "i2c_1"
+e.g. test i2c_1    : Start test for i2c commands according to the test file "i2c_1"
 ```
 
-Bisides, the I2C Tool has a simple test suite. With it, you can give a test file and run a series of tests like any other software test. In the test file, list the expected response for the send command and the subsequent receive command as follows.
+Bisides, the I2C Tool has a simple test suite. With it, you can give a test file and run a series of tests like any other software testing environment. 
+
+This feature is not as good for detailed debugging as ICE, but it will be useful for the regression test like CI.
+
+In the test file, list the expected response for the send command and the subsequent receive command as follows.
 ```
 #
-# i2c_1 command test
+# i2c_1   command test example
 #
 
 # CMD_SPEC = 0xFF	 ;; param:[],			        ret: [PROD_ID, VER, N_PORT]
 wr ff 3
 => 01 01 08
 
-# dummy
+# test to this testing suite, should be failed always
 wr ff 3
-=> 01 01 02
+=> 01 01 01
 ```
 
 Once you have your test file, drag and drop it into `/CIRCUITPY/` just like you would a .hex file.
@@ -154,9 +158,6 @@ I2C 0x2f> test i2c_1
 ------------------------------------------------------------
 FAILED: 1/2, Lines: 4
 ```
-
-This feature is not as good for detailed debugging as ICE, but it is useful for regression testing as well as CI.
-
 
 ## TODO
 - [ ] rewrite the output for icsp pulse to properly 
