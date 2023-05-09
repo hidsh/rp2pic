@@ -127,9 +127,7 @@ e.g. wr 2 C2 5 10  : Write data "0x02 0xC2 0x05" to target device,
 e.g. test i2c_1    : Start test for i2c commands according to the test file "i2c_1"
 ```
 
-Bisides, the I2C Tool has a simple test suite. With it, you can give a test file and run a series of tests like any other software testing environment. 
-
-This feature is not as good for detailed debugging as ICE, but it will be useful for the regression test like CI.
+Bisides, the I2C Tool has a simple test suite. With it, you can give a test file and run a series of tests like any other software testing environment. This feature is not as good for detailed debugging as ICE, but it will be useful for the regression test like CI.
 
 In the test file, list the expected response for the send command and the subsequent receive command as follows.
 ```
