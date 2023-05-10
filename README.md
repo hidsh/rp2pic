@@ -5,8 +5,7 @@ A PIC Programmer by Raspberry Pi Pico and the cousins
 ![breadboard example](img/breadboard.jpg)
 
 **WIP**
-
-RP2PIC runs on [circuitpython](https://circuitpython.org/).
+RP2PIC is a LV-ICSP Programmer for the PIC16F1xxx which runs on [circuitpython](https://circuitpython.org/).
 
 This project is based on a [blog article](https://ameblo.jp/lonetrip/entry-12763727309.html). Thanks!
 
@@ -26,6 +25,7 @@ For now I've just built it on a breadboard, but I'm going to make dedicated PCBs
 |Device|Support|Note|
 |:---|:---:|:---|
 |16f1503|yes|not checked data memory|
+|16f1823|yes|not checked data memory|
 |16f1933|not yet||
 
 
