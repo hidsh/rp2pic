@@ -79,11 +79,11 @@ Auto Prog : No
 Device    : PIC16F1503
 File      : 16f1503_blink_intosc.hex    2023-4-26 18:13:4
 
-MI/MO     : Enter/Exit LV-ICSP Mode                  (White)
-RP/RD/RC  : Read   Program/Data/Configuration Memory (Green)
-EP/ED     : Erase  Program/Data               Memory (Yellow)
-WP/WD/WC  : Write  Program/Data/Configuration Memory (Red)
-VP/VD/VC  : Verify Program/Data/Configuration Memory (Cyan)
+MI/MO     : Enter/Exit LV-ICSP Mode
+RP/RD/RC  : Read   Program/Data/Configuration Memory
+EP/ED     : Erase  Program/Data               Memory
+WP/WD/WC  : Write  Program/Data/Configuration Memory
+VP/VD/VC  : Verify Program/Data/Configuration Memory
 ```
 
 ### Auto-Prog Mode
