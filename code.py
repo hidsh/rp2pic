@@ -473,6 +473,10 @@ class I2C_Tool:
             else:
                 print(found[0][2])
 
+    def cmd_reset(self, args=[]):
+        global icsp
+        icsp.reset()
+
     def deinit(self):
         self.i2c.deinit()
         del self.i2c
@@ -635,7 +639,7 @@ class I2C_Tool:
      quit          : <alias>
      !!!           : <alias>'''),
 
-(['RESET'], ICSP.reset,
+(['RESET'], cmd_reset,
 '''e.g. reset         : Reset target device'''),
 
 (['SCAN'], cmd_scan,
