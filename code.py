@@ -932,6 +932,10 @@ while True:                 # command loop (top)
             slaves = tool.cmd_scan()
             if not slaves:
                 print('No slave device')
+                tool.deinit()
+                del tool
+                break
+
             elif len(slaves) == 1:
                 tool.tgt_addr = slaves[0]       # auto setting target device address
             else:
