@@ -14,7 +14,7 @@ This project is based on a [blog article](https://ameblo.jp/lonetrip/entry-12763
 
 - [Command Mode](#command-mode)
 - [Auto-Programming Mode](#auto-prog-mode)
-- [I2C Debugging Tool](#i2c-debug-tool)
+- [I2C Tool](#i2c-tool)
 
 ## Hardware
 ![schematic](img/rp2pic_schematic.png)
@@ -90,13 +90,13 @@ VP/VD/VC  : Verify Program/Data/Configuration Memory
 
 Auto-Prog Mode behaves as an automatic programmer. You can program it into PIC just by Drag and Drop a hex file.
 
-### I2C Debug Tool
+### I2C Tool
 
 This tool is for debugging PIC devices that implement I2C slave functionality.
 
-RP2PIC acts as an I2C master device to send and receive I2C commands to and from PIC devices. If you only test a simple circuit using I2C, you can input I2C commands to the device from the host PC and check the response while the RP2PIC is connected. To use the I2C debug tool, type `i2c` at the top level prompt `>`. A new prompt (e.g. `I2C 0x2f>`) shows the slave address of the device debugging now.
+RP2PIC acts as an I2C master device to send and receive I2C commands to and from PIC devices. If you only test a simple circuit using I2C, you can input I2C commands to the device from the host PC and check the response while the RP2PIC is connected. To use the I2C tool, type `i2c` at the top level prompt `>`. A new prompt (e.g. `I2C 0x2f>`) shows the slave address of the device debugging now.
 
-To show command help, type `h` at the i2c prompt `I2C 0xXX>`.
+To show command help for this tool, type `h` at the i2c prompt `I2C 0xXX>`.
 
 ```
 # RP2PIC - PIC16F1xxx LV-ICSP Programmer
