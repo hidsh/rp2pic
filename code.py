@@ -30,28 +30,34 @@ if board.board_id == 'Seeeduino XIAO RP2040':
 
 DEVICE_LIST = {
     0x2700: {  # Device ID
+        'N': 'PIC12F1822',  # Device Name
         'P': [0x0000, 0x0800, 0x3FFF],  # Address, Size, Value
         'C': [0x8007, 0x0002, 0x3FFF],  # Address, Size, Value
         'D': [0xF000, 0x0100, 0x00FF],  # Address, Size, Value
-        'N': 'PIC12F1822',  # Device Name
     },
     0x1BC0: {  # Device ID
+        'N': 'PIC12LF1840',  # Device Name
         'P': [0x0000, 0x1000, 0x3FFF],  # Address, Size, Value
         'C': [0x8007, 0x0002, 0x3FFF],  # Address, Size, Value
         'D': [0xF000, 0x0100, 0x00FF],  # Address, Size, Value
-        'N': 'PIC12LF1840',  # Device Name
     },
     0x2CE0: {  # Device ID
+        'N': 'PIC16F1503',  # Device Name
         'P': [0x0000, 0x0800, 0x3FFF],  # Address, Size, Value
         'C': [0x8007, 0x0002, 0x3FFF],  # Address, Size, Value
         'D': [0xF000, 0x0000, 0x00FF],  # Address, Size, Value # TODO temporary disabled, High-Endurance Flash should be supported
-        'N': 'PIC16F1503',  # Device Name
+    },
+    0x2720: {  # Device ID
+        'N': 'PIC16F1823',  # Device Name
+        'P': [0x0000, 0x0800, 0x3FFF],  # Address, Size, Value
+        'C': [0x8007, 0x0002, 0x3FFF],  # Address, Size, Value
+        'D': [0xF000, 0x0100, 0x00FF],  # Address, Size, Value
     },
     0x2300: {  # Device ID
+        'N': 'PIC16F1933',  # Device Name
         'P': [0x0000, 0x0800, 0x3FFF],  # Address, Size, Value
         'C': [0x8007, 0x0002, 0x3FFF],  # Address, Size, Value
         'D': [0xF000, 0x0000, 0x00FF],  # Address, Size, Value
-        'N': 'PIC16F1933',  # Device Name
     },
 }
 
@@ -679,14 +685,14 @@ def print_help():
     print(   f'Device    : {device['N']}')
     print(   f'File      : {hex_file}\t{tstamp or ''}')
     prinp()
-    prinp(    'MI/MO     : Enter/Exit LV-ICSP Mode                  (White)')
+    prinp(    'MI/MO     : Enter/Exit LV-ICSP Mode')
     if device:
-        prinp('RP/RD/RC  : Read   Program/Data/Configuration Memory (Green)')
-        prinp('EP/ED     : Erase  Program/Data               Memory (Yellow)')
-        prinp('WP/WD/WC  : Write  Program/Data/Configuration Memory (Red)')
-        prinp('VP/VD/VC  : Verify Program/Data/Configuration Memory (Cyan)')
+        prinp('RP/RD/RC  : Read   Program/Data/Configuration Memory')
+        prinp('EP/ED     : Erase  Program/Data               Memory')
+        prinp('WP/WD/WC  : Write  Program/Data/Configuration Memory')
+        prinp('VP/VD/VC  : Verify Program/Data/Configuration Memory')
     else:
-        prinp('RC        : Read Configuration Memory                (Green)')
+        prinp('RC        : Read Configuration Memory')
         prinp('# Tools')
         prinp('I2C       : I2C Tool')
         prinp('IIC       : <alias>')
