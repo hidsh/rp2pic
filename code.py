@@ -1,4 +1,4 @@
-# -----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 # PIC16F1xxx LV-ICSP Programmer by RP2040 cousins. and CircuitPython
 #
 # This project is based on a blog article (https://ameblo.jp/lonetrip/entry-12763727309.html). Thanks!
@@ -18,12 +18,12 @@
 #   GP16 : GPO/GPI --- 10k ---  13 RA0: ICSPDAT
 
 import time
+import re
 import board
 import digitalio
 from busio import I2C
 from os import stat, listdir
 from adafruit_datetime import datetime
-# import icsp
 
 if board.board_id == 'Seeeduino XIAO RP2040':
     import neopixel_write
@@ -65,7 +65,7 @@ DEVICE_LIST = {
 # Low-Voltage In-Circuit Serial Programming (LV-ICSP) Class
 
 class ICSP:
-    WAIT_TCLK = 200e-9  # 200 ns
+    WAIT_TCLK = 200e-9  # 200 ns        ;; TODO time.sleep() under usec have no accurate waiting, find another way
     WAIT_TDLY = 1e-6  # 1 us
     WAIT_TENT = 1e-3  # 1 ms
     WAIT_TERA = 5e-3  # 5 ms
@@ -244,8 +244,10 @@ class ICSP:
             self.run_increment_address()
             if ((next_address % self.COLUMN) == 0) or (next_address == size):
                 column_data = data[base_address:next_address]
-                print_data_line(base_address, column_data)
+                # print_data_line(base_address, column_data)
+                print('*', end='')
                 base_address = next_address
+        print()
 
     def write_program_memory(self, data):
         if data:
@@ -291,7 +293,7 @@ def verify_data(memory, config, read_data):
     print_data(data_hex)
     prinp('Device')
     if config:
-        data_device = icsp.read_configuration(11, 'config')[7:9]
+        data_device = detector.icsp.read_configuration(11, 'config')[7:9]
     else:
         data_device = read_data(memory[1])
     if data_hex == data_device:
@@ -300,23 +302,6 @@ def verify_data(memory, config, read_data):
     else:
         prinp('Verify NG')
         return -1    # error
-
-def read_configuration():
-    data = icsp.read_configuration(11, False)
-    device_id = data[6] & 0x3FE0
-    device_infomation = DEVICE_LIST.get(device_id)
-    if device_infomation is None:
-        device_name = '(Not Supported)'
-    else:
-        device_name = '(' + device_infomation['N'] + ')'
-
-    prinp('# Configuration')
-    prinp('User ID Location   :', hexstr(data[0:4]))
-    prinp('Device ID          :', hexstr([device_id]), device_name)
-    prinp('Revision ID        :', hexstr([data[6] & 0x1F]))
-    prinp('Configuration Word :', hexstr(data[7:9]))
-    prinp('Calibration Word   :', hexstr(data[9:11]))
-    return device_infomation
 
 def read_hex_file(name, memory):
     memory_address = memory[0]
@@ -448,7 +433,107 @@ class LED_NEOPIXEL:
     def ON_VERIFY(self):  # Cyan
         neopixel_write.neopixel_write(self.DAT, bytearray([0x20, 0x00, 0x20]))
 
-class I2C_Tool:
+class Detector:
+    device_info = dict.fromkeys(['user_id_location',
+                                 'device_id',
+                                 'revision_id',
+                                 'configuration_word',
+                                 'calibration_word',
+                                 'device_name',
+                                 'P',
+                                 'C',
+                                 'D',
+                                 'i2c_slave_addr'])
+    def __init__(self):
+        pass
+        if PIN_ICSP_MCLR and PIN_ICSP_CLK and PIN_ICSP_DAT:
+            self.icsp = ICSP(PIN_ICSP_MCLR, PIN_ICSP_CLK, PIN_ICSP_DAT)
+
+            # with NO_Printer():
+            info = self.get_device_info()
+
+            self.device_info.update(info)
+        else:
+            print('Error: Can not get icsp interface. Check PIN_ICSP_MCLR, PIN_ICSP_CLK, PIN_ICSP_DAT if you use programing  to PIC uC.')
+
+        if PIN_I2C_SCL and PIN_I2C_SDA:
+            self.tool_i2c = I2C_Tool(PIN_I2C_SCL, PIN_I2C_SDA)
+            slaves = self.tool_i2c.cmd_scan()
+            self.device_info.update({'i2c_slave_addr': slaves})
+        else:
+            print('Error: Can not get i2c interface. Check PIN_I2C_SCL, PIN_I2C_SCL if you use I2C Tool.')
+
+    def get_device_info(self):
+        self.icsp.set_lvp_mode()
+        conf = self.icsp.read_configuration(11, False)
+        self.icsp.set_normal_mode()
+
+        device_id = conf[6] & 0x3FE0
+        icsp_setting = DEVICE_LIST.get(device_id)
+
+        device_info = {'user_id_location': hexstr(conf[0:4]),
+                       'device_id': hexstr([device_id]),
+                       'revision_id': hexstr([conf[6] & 0x1F]),
+                       'configuration_word': hexstr(conf[7:9]),
+                       'calibration_word': hexstr(conf[9:11]),
+                       'device_name': icsp_setting['N'] if icsp_setting else None,
+                       'P': icsp_setting['P'] if icsp_setting else None,
+                       'C': icsp_setting['C'] if icsp_setting else None,
+                       'D': icsp_setting['D'] if icsp_setting else None}
+        return device_info
+
+    def show_detail(self):
+        di = self.device_info
+        print(f"""# ICSP setting
+  Device ID            : {di['device_id']}
+  Device Name          : {di['device_name'] or '*** Not Supported ***'}
+  Program Memory       : {di['P']}
+  Data Memory          : {di['D']}
+  Configuration Memory : {di['C']}
+
+# I2C Tool setting
+  I2C Slave Address    : {[hex(x) for x in di['i2c_slave_addr']] or '*** Not Detected ***'}""")
+
+    def diagnose_icsp(self):
+        ret = 0
+        di = self.device_info
+        if di['device_name']:
+            prinp(f'Device detected, Name={di["device_name"]}, Device ID={di["device_id"]}')
+        else:
+            print(f'---{di["device_id"]}---')
+            if di['device_id'] != '0000':
+                prinp(f'Error: Wrong connection to the PIC device?')
+                ret = -1
+            else:
+                prinp(f'Error: Not found device info. Unsupported Device ID for {hexstr(di["device_id"])}')
+                ret = -2
+
+            prinp('       All programming features can not be used until fix it.')
+        return ret
+
+    def diagnose_i2c(self):
+        ret = 0
+        slaves = self.device_info['i2c_slave_addr']
+        if not slaves:
+            prinp(f'Error: I2C slave not found. Check connection to the PIC device and try re-scanning.')
+            ret = -1
+        elif slaves and len(slaves) > 1:
+            prinp(f'Caution: Detected multiple I2C slaves. Choose one of {slaves}')
+            self.device_info['i2c_slave_addr'] = select_i2c_slave(slaves)
+
+        return ret
+
+    def select_i2c_slave(self, slaves):
+        sel = None
+        while not sel:
+            s = input().upper()
+            print(f'--- {s} in {slaves} ---')
+            if s in [x.upper() for x in slaves]:
+                sel = s
+
+        return sel
+
+class I2C_Tool():
     tgt_addr = None
 
     def __init__(self, scl, sda):
@@ -474,12 +559,23 @@ class I2C_Tool:
                 print(found[0][2])
 
     def cmd_reset(self, args=[]):
-        global icsp
-        icsp.reset()
+        try:
+            detector.icsp.reset()
+        except NameError:
+            print('Error: Cannot Reset slave device because ICSP is not available.')
+
+    def cmd_sleep(self, args=[]):
+        if not args or not args[0].isdigit():
+            print("Error: Command 'sleep' needs a decimal integer argument. e.g. 'sleep 1' for sleeping 1 seconds")
+            return
+
+        time.sleep(float(args[0]))
+
+    def cmd_print(self, args=[]):
+        print(' ' + ' '.join(args) + ' ')
 
     def deinit(self):
         self.i2c.deinit()
-        del self.i2c
 
     def cmd_scan(self, args=[]):
         slaves = []
@@ -521,7 +617,11 @@ class I2C_Tool:
         if not s_args:
             sz = 1
         else:
-            sz = max(int(s_args[0]), 1)
+            s_sz = s_args[-1]
+            if not s_sz.isdigit():
+                print(f'Error: The only parameter of the "R" command should be specifed the byte length to read as a decimal integer: {s_sz}')
+                return
+            sz = max(int(s_sz), 1)
 
         rx_buf = bytearray(sz)
         err=''
@@ -549,7 +649,12 @@ class I2C_Tool:
         if not s_args:
             sz = 1
         else:
-            sz = max(int(s_args[-1]), 1)
+            s_sz = s_args[-1]
+            if not s_sz.isdigit():
+                print(f'Error: The last parameter of the "WR" command should be specifed the byte length to read as a decimal integer: {s_sz}')
+                return
+
+            sz = max(int(s_sz), 1)
 
         rx_buf = bytearray(sz)
         tx_data = [int(x, 16) for x in s_args[:-1]]
@@ -580,13 +685,13 @@ class I2C_Tool:
 
     def cmd_test(self, s_args):
         if len(s_args) != 1:
-            print('Error: Test file is not specified')
+            print('Error: File is not specified')
             return
 
         test_path = s_args[0]
 
         if not self.isfile(test_path):
-            print(f'Error: Test file not found: "{test_path}"')
+            print(f'Error: File not found: "{test_path}"')
             return
 
         with open(test_path) as f:
@@ -597,30 +702,62 @@ class I2C_Tool:
         G = '\033[30m\033[42m'
         END   = '\033[0m'
         print('-' * 60, end='')
-        resp = ''
-        tn = 0
+        func_cmd = ''
+        func_param = []
+        print_param = []
+        test_num = 0
         cnt_ok = 0
         cnt_ng = 0
         for ln, s in enumerate(lines, start=1):
             if s == '' or s.startswith('#'):   # empty line or comment
                 continue
-            elif s.startswith('=>'):
-                ok = ' '.join(s.upper().split()[1:])
+            elif m := re.match('\=>(.*)', s):
+                print('=> ', end='')
+                ok = ' '.join(m.group(1).upper().split())
+                with NO_Printer():
+                    resp = self.handler(func_cmd, func_param)
+
                 if resp == ok:
-                    print(f'{G} PASS {END}\t{ln:8}', end='')
+                    print(f'{resp:12}\t{G} PASS {END}\t{ln:8}', end='')
                     cnt_ok += 1
                 else:
-                    print(f'{RED} FAIL {END}\t{ln:8} Should be "{ok}"', end='')
+                    print(f'{resp:12}\t{RED} FAIL {END}\t{ln:8} Should be "{ok}"', end='')
                     cnt_ng += 1
+            elif m := re.match('\?(.*)>(.*)', s):
+                ps = m.group(1)
+                bs1 = '\b' * len(ps)
+                bs2 = ' ' * len(ps)
+                print('?> ' + ps, end='')
+                ok = ' '.join(m.group(2).upper().split())
+                cnt_ok_old = cnt_ok
+                TIMEOUT_SEC = 10
+                timeout_start = now = time.monotonic()
+                while now < timeout_start + TIMEOUT_SEC:
+                    with NO_Printer():
+                        resp = self.handler(func_cmd, func_param)
+
+                    if resp == ok:
+                        print(f'{bs1}{bs2}{bs1}{resp:12}\t{G} PASS {END}\t{ln:8}', end='')
+                        cnt_ok += 1
+                        break
+                    now = time.monotonic()
+
+                if cnt_ok == cnt_ok_old:
+                    print(f'{bs1}{bs2}{bs1}{resp:12}\t{RED} FAIL {END}\t{ln:8} Should be "{ok}"', end='')
+                    cnt_ng += 1
+
             else:
                 ll = s.upper().split()
-                resp = self.handler(ll[0], ll[1:])
-                if ll[0] in ['R', 'WR']:
-                    tn += 1
-                    print(f'\n{tn:3}: {s:20} => {resp:12}', end='\t')
+                func_cmd = ll[0]
+                func_param = ll[1:]
+
+                if func_cmd in ['R', 'WR']:
+                    test_num += 1
+                    print(f'\n{test_num:3}: {s:20} ', end='')
+
         print('\n' + '-' * 60)
         if cnt_ok == 0 and cnt_ng == 0:
-            print(f'{RED}NO TEST (Lines: {len(lines)}){END}')
+            print(f'{RED}NO TESTS (Lines: {len(lines)}){END}')
         elif cnt_ok == cnt_ok + cnt_ng:
             print(f'{GREEN}ALL TESTS PASSED SUCCESSFULLY (Tests: {cnt_ok}, Lines: {len(lines)}){END}')
         else:
@@ -660,14 +797,22 @@ class I2C_Tool:
 
 (['WR'], cmd_write_then_read,
 '''e.g. wr 2 C2 5 10  : Write data "0x02 0xC2 0x05" to target device,
-                   :  then read 10 bytes from target device
+                      then read 10 bytes from target device
      wr 10         : Write to target device without any data,
-                   :  then read 10 bytes from target device
+                      then read 10 bytes from target device
      wr            : Write to target device without any data,
-                   :  then read 1 byte from target device'''),
+                      then read 1 byte from target device'''),
+
+(['SLEEP'], cmd_sleep,
+'''e.g. sleep 2       : Sleep (wait for) 2 seconds'''),
+
+(['PRINT'], cmd_print,
+'''e.g. print Hello!  : Print "Hello!" ends a white space instead of
+                      carriage return'''),
 
 (['TEST'], cmd_test,
-'''e.g. test i2c_1    : Start test for i2c command　according to the test file "i2c_1".'''))
+'''e.g. test i2c_1    : Start test for i2c command according to
+                      the test file "i2c_1".'''))
 
 class NO_Printer:
     def __enter__(self):
@@ -678,60 +823,68 @@ class NO_Printer:
     def __exit__(self, exc_type, exc_value, tracebak):
         global prinp
         prinp = self.func_orig
+
     def nop(*objs, sep='', end='\n'):
         pass
 
 def prinp(*objs, sep='', end='\n'):
     print(*objs, sep=sep, end=end)
 
-def print_help():
-    print(   f'Auto Prog : {'Yes' if auto_prog else 'No'}')
-    print(   f'Device    : {device['N']}')
-    print(   f'File      : {hex_file}\t{tstamp or ''}')
+def print_help(di):
+    print(   f'Auto Prog : {"Yes" if auto_prog else "No"}')
+    print(   f'Device    : {di["device_name"] or "*** Not Supported ***"}')
+    print(   f'File      : {hex_file}\t{tstamp or ""}')
     prinp()
-    prinp(    'MI/MO     : Enter/Exit LV-ICSP Mode')
-    if device:
-        prinp('RP/RD/RC  : Read   Program/Data/Configuration Memory')
-        prinp('EP/ED     : Erase  Program/Data               Memory')
-        prinp('WP/WD/WC  : Write  Program/Data/Configuration Memory')
-        prinp('VP/VD/VC  : Verify Program/Data/Configuration Memory')
+    ## temporary disabled ##
+    # prinp(    'MI/MO     : Enter/Exit LV-ICSP Mode')
+    if di['device_name']:
+        prinp('# ICSP')
+        prinp('  RP/RD/RC  : Read   Program/Data/Configuration Memory')
+        prinp('  EP/ED     : Erase  Program/Data               Memory')
+        prinp('  WP/WD/WC  : Write  Program/Data/Configuration Memory')
+        prinp('  VP/VD/VC  : Verify Program/Data/Configuration Memory')
+        ## temporary disabled ##
+        # prinp('RC        : Read Configuration Memory')
     else:
-        prinp('RC        : Read Configuration Memory')
+        detector.show_detail()
+
+    if di['i2c_slave_addr']:
+        prinp()
         prinp('# Tools')
-        prinp('I2C       : I2C Tool')
-        prinp('IIC       : <alias>')
-        prinp('II        : <alias>')
+        prinp('  I2C       : I2C Tool')
+        prinp('  IIC       : <alias>')
+        prinp('  II        : <alias>')
 
 class LVP_Mode:
     def __enter__(self):
-        icsp.set_lvp_mode()
+        detector.icsp.set_lvp_mode()
 
     def __exit__(self, exc_type, exc_value, traceback):
-        icsp.set_normal_mode()
+        detector.icsp.set_normal_mode()
 
 def proc_auto_prog():
     print('WP', end=', ')
     led.ON_WRITE()
-    icsp.write_program_memory(read_hex_file(hex_file, device['P']))     # WP
+    detector.icsp.write_program_memory(read_hex_file(hex_file, device['P']))     # WP
 
     print('VP', end=', ')
     led.ON_VERIFY()
-    if(verify_data(device['P'], False, icsp.read_program_memory)):      # VP
+    if(verify_data(device['P'], False, detector.icsp.read_program_memory)):      # VP
        return 'Error: Program memory'
 
     if device['D'][1] > 0:      # check data memory size
         print('WD', end=', ')
         led.ON_WRITE()
-        icsp.write_data_memory(read_hex_file(hex_file, device['D']))    # WD
+        detector.icsp.write_data_memory(read_hex_file(hex_file, device['D']))    # WD
 
         print('VD', end=', ')
         led.ON_VERIFY()
-        if(verify_data(device['D'], False, icsp.read_data_memory)):     # VD
+        if(verify_data(device['D'], False, detector.icsp.read_data_memory)):     # VD
            return 'Error: Data memory'
 
     print('WC', end=', ')
     led.ON_WRITE()
-    icsp.write_configulation(read_hex_file(hex_file, device['C']))      # WC
+    detector.icsp.write_configulation(read_hex_file(hex_file, device['C']))      # WC
 
     print('VC', end=', ')
     led.ON_VERIFY()
@@ -752,10 +905,17 @@ def get_latest_hex():
     if hexs:
         tstamps = [stat(x)[8] for x in hexs]    # mtime
         max_idx = tstamps.index(max(tstamps))
-        # prinp(tstamps[max_idx])
         return (hexs[max_idx], fmt_time(tstamps[max_idx]))
     else:
         return (None, None)
+
+
+def check_hex_file():
+    hex_path = None
+    while not hex_path:
+        hex_path, tstamp = get_latest_hex()
+        time.sleep(0.2)
+    return (hex_path, tstamp)
 
 def halt():
     while True:
@@ -787,11 +947,14 @@ elif board.board_id == 'raspberry_pi_pico':
     PIN_I2C_SDA = board.GP12
 
 else:
-    prinp(f'Unsuppored Board ID:{board.board_id}')
-    while True:
-        pass
+    prinp(f'Error: Unsuppored Board ID: {board.board_id}')
+    halt()
 
-icsp = ICSP(PIN_ICSP_MCLR, PIN_ICSP_CLK, PIN_ICSP_DAT)
+with NO_Printer():
+    detector = Detector()
+
+# with NO_Printer():
+# info = self.get_device_info()
 
 # Automatic programming?
 SW = digitalio.DigitalInOut(PIN_SW_AUTO)
@@ -806,32 +969,20 @@ RETRY_MAX = 5
 
 print()
 print('# RP2PIC - PIC16F1xxx LV-ICSP Programmer')
-print('waiting hex...')
+print('Waiting hex file...')
+
 while True:                 # command loop (top)
-    hex_file = ''
-    while not hex_file:
-        with NO_Printer():
-            hex_file, tstamp = get_latest_hex()
-            # print(f'fn={hex_file}, {tstamp}')
-        time.sleep(0.2)
+    with NO_Printer():
+        hex_file, tstamp = check_hex_file()
 
-    device = None
-    retry_count = 0
-    while not device and retry_count < RETRY_MAX:
-        led.set_error(1)
-        with LVP_Mode():
-            with NO_Printer():
-                device = read_configuration()
-        time.sleep(0.2)
-        retry_count += 1
+    # auto-prog mode
+    auto_prog = not SW.value    # Press (LOW) -> Auto prog:ON
 
-    if not device:
-        with LVP_Mode():
-            device = read_configuration()
-        raise RuntimeError('Error while read_configuration. Unsupported Device ID?')
-
-    auto_prog = not SW.value    # Press (LOW) --> Auto prog:ON
     if auto_prog:
+        if detector.diagnose_icsp() < 0:
+            detector = Detector()
+            continue                    # prints error infinitely til the proper connections
+
         print('Auto Prog detected.')
         print(f'Programming {hex_file}... ', end='')
         with LVP_Mode():
@@ -848,121 +999,126 @@ while True:                 # command loop (top)
 
         halt()                  # wait updating files content or reset
 
-    # Manual commands
+    # command mode
     print('> ', end='')
     text = input().strip().upper()
     if text in ['?', 'H', 'HELP']:
-        print_help()
+        print_help(detector.device_info)
     elif text == 'RESET':
         led.ON_MODE()
-        icsp.reset()
+        detector.icsp.reset()
         led.set_error(0)
-        led.OFF()
-    elif text == 'MI':
-        led.ON_MODE()
-        icsp.set_lvp_mode()
-    elif text == 'MO':
-        led.ON_MODE()
-        icsp.set_normal_mode()
-        device = None
-    elif text == 'RC':
-        led.ON_READ()
-        with LVP_Mode():
-            device = read_configuration()
-        led.set_error(device is None)
-    elif text == 'RP':
-        led.ON_READ()
-        with LVP_Mode():
-            icsp.read_program_memory(device['P'][1])
-    elif text == 'RD':
-        led.ON_READ()
-        with LVP_Mode():
-            icsp.read_data_memory(device['D'][1])
-    elif text == 'EP':
-        led.ON_ERASE()
-        with LVP_Mode():
-            icsp.erase_program_memory()
-    elif text == 'ED':
-        led.ON_ERASE()
-        with LVP_Mode():
-            icsp.erase_data_memory()
-    elif text == 'WP':
-        led.ON_WRITE()
-        with LVP_Mode():
-            icsp.write_program_memory(read_hex_file(hex_file, device['P']))
-        # TODO do not overwrite configuration word
-        # なぜかWPでconfiguration wordを書くとおかしくなる(WPのあとでWCで書くと問題ない)
-        #  File Data
-        #    0000: 39E4 3FFF
-        #  Read Data
-        #    0000: 3FFF 3FFF <--!!
-        # 最悪 :02 0000 04 0001 F9 から次の:02 0000 04 0001以外 まで無視するとか)
-    elif text == 'WD':
-        led.ON_WRITE()
-        with LVP_Mode():
-            icsp.write_data_memory(read_hex_file(hex_file, device['D']))
-    elif text == 'WC':
-        led.ON_WRITE()
-        with LVP_Mode():
-            icsp.write_configulation(read_hex_file(hex_file, device['C']))
-    elif text == 'VP':
-        led.ON_VERIFY()
-        with LVP_Mode():
-            verify_data(device['P'], False, icsp.read_program_memory)
-    elif text == 'VD':
-        led.ON_VERIFY()
-        with LVP_Mode():
-            verify_data(device['D'], False, icsp.read_data_memory)
-    elif text == 'VC':
-        led.ON_VERIFY()
-        with LVP_Mode():
-            verify_data(device['C'], True, None)
-    elif text == 'TF':
-        data = read_hex_file(hex_file, device['P'])
-        if not data: continue
-        prinp('Program Memory');        print_data(data)
+        led.OFF
+    elif text in ['RP', 'RD', 'EP', 'ED', 'WP', 'WD', 'WC', 'VP', 'VD', 'VC', 'TF']:
+        if detector.diagnose_icsp() < 0:
+            detector.show_detail()
+            with NO_Printer():
+                detector = Detector()
+            continue
 
-        data = read_hex_file(hex_file, device['C'])
-        if not data: continue
-        prinp('Configuration Memory');  print_data(data)
+        ## temporary disable ##
+        # if text == 'MI':
+        #     led.ON_MODE()
+        #     icsp.set_lvp_mode()
+        # elif text == 'MO':
+        #     led.ON_MODE()
+        #     icsp.set_normal_mode()
+        #     device = None
+        # elif text == 'RC':
+        #     led.ON_READ()
+        #     with LVP_Mode():
+        #         device = read_configuration()
+        #     led.set_error(device is None)
+        elif text == 'RP':
+            led.ON_READ()
+            with LVP_Mode():
+                detector.icsp.read_program_memory(detector.device_info['P'][1])
+        elif text == 'RD':
+            led.ON_READ()
+            with LVP_Mode():
+                detector.icsp.read_data_memory(detector.device_info['D'][1])
+        elif text == 'EP':
+            led.ON_ERASE()
+            with LVP_Mode():
+                detector.icsp.erase_program_memory()
+        elif text == 'ED':
+            led.ON_ERASE()
+            with LVP_Mode():
+                detector.icsp.erase_data_memory()
+        elif text == 'WP':
+            led.ON_WRITE()
+            with LVP_Mode():
+                detector.icsp.write_program_memory(read_hex_file(hex_file, detector.device_info['P']))
+            # TODO do not overwrite configuration word
+            # なぜかWPでconfiguration wordを書くとおかしくなる(WPのあとでWCで書くと問題ない)
+            #  .hex Data
+            #    0000: 39E4 3FFF
+            #  Read Data
+            #    0000: 3FFF 3FFF <--!!
+            #
+            # TODO: 最悪 :02 0000 04 0001 F9 から次の:02 0000 04 0001以外 まで無視するとか)
+        elif text == 'WD':
+            led.ON_WRITE()
+            with LVP_Mode():
+                detector.icsp.write_data_memory(read_hex_file(hex_file, detector.device_info['D']))
+        elif text == 'WC':
+            led.ON_WRITE()
+            with LVP_Mode():
+                detector.icsp.write_configulation(read_hex_file(hex_file, detector.device_info['C']))
+        elif text == 'VP':
+            led.ON_VERIFY()
+            with LVP_Mode():
+                verify_data(detector.device_info['P'], False, detector.icsp.read_program_memory)
+        elif text == 'VD':
+            led.ON_VERIFY()
+            with LVP_Mode():
+                verify_data(detector.device_info['D'], False, detector.icsp.read_data_memory)
+        elif text == 'VC':
+            led.ON_VERIFY()
+            with LVP_Mode():
+                verify_data(detector.device_info['C'], True, None)
+        elif text == 'TF':
+            data = read_hex_file(hex_file, detector.device_info['P'])
+            if not data: continue
+            prinp('Program Memory');        print_data(data)
 
-        data = read_hex_file(hex_file, device['D'])
-        if not data: continue
-        prinp('Data Memory');           print_data(data)
+            data = read_hex_file(hex_file, detector.device_info['C'])
+            if not data: continue
+            prinp('Configuration Memory');  print_data(data)
+
+            data = read_hex_file(hex_file, detector.device_info['D'])
+            if not data: continue
+            prinp('Data Memory');           print_data(data)
 
     elif text in ['I2C', 'IIC', 'II']:
-        tool = I2C_Tool(PIN_I2C_SCL, PIN_I2C_SDA)
+        tool = detector.tool_i2c
         while True:                     # command loop (I2C)
             slaves = tool.cmd_scan()
             if not slaves:
                 print('No slave device')
-                tool.deinit()
-                del tool
                 break
 
             elif len(slaves) == 1:
                 tool.tgt_addr = slaves[0]       # auto setting target device address
             else:
-                print(f'Choose target (Slave address): {" ".join(slaves)}')
+                print(f'Choose target device: {" ".join(slaves)}')
                 print('e.g. "addr 2b" to choose 0x2B as a target device address')
 
             print(f'I2C {hex(tool.tgt_addr)}> ', end='')
             line = input().split()
+            if not line:
+                continue
+
             cmd = line[0].upper()
             args = line[1:]
-            invalid_args = [x for x in args if len(x) > 2] if not cmd in ['TEST'] else []
+            invalid_args = [] if cmd in ['TEST', 'PRINT'] else [x for x in args if len(x) > 2]
 
             if invalid_args:
                 print(f'Invalid Data: {" ".join(invalid_args)}')
             elif cmd in ['EXIT', 'QUIT', '!!!']:
-                tool.deinit()
-                del tool
                 break
-            elif cmd == '':
-                continue
 
-            with NO_Printer():
-                tool.handler(cmd, args)
+            tool.handler(cmd, args)
 
     elif text == '':
         pass
